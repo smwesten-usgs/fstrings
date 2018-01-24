@@ -16,6 +16,11 @@ module fstrings
 !    procedure :: concatenate_char_double_fn
   end interface operator(+)
 
+  public :: as_uppercase
+  interface as_uppercase
+    procedure :: character_to_uppercase_fn
+  end interface as_uppercase
+
   type FSTRINGS_T
 
     character (len=:), allocatable        :: s
@@ -39,11 +44,14 @@ module fstrings
     procedure   :: count_strings_in_list_fn
     generic     :: count => count_strings_in_list_fn
 
+    procedure   :: retrieve_value_from_list_at_index_fn
+    generic     :: get => retrieve_value_from_list_at_index_fn
+
     procedure   :: deallocate_all_list_items_sub
     generic     :: clear => deallocate_all_list_items_sub
 
-    procedure   :: char_to_uppercase_fn
-    generic     :: upper => char_to_uppercase_fn
+    procedure   :: fstring_to_uppercase_fn
+    generic     :: upper => fstring_to_uppercase_fn
 
   end type FSTRINGS_T
 
@@ -77,7 +85,7 @@ contains
 
   subroutine assign_character_to_fstring_sub(this, character_str)
 
-    class (FSTRINGS_T), intent(inout), target        :: this
+    class (FSTRINGS_T), intent(inout)                :: this
     character (len=*), intent(in)                    :: character_str
 
     call this%clear()
@@ -91,7 +99,7 @@ contains
 
   subroutine assign_fstring_to_character_sub(this, character_str)
 
-    class (FSTRINGS_T), intent(inout), target         :: this
+    class (FSTRINGS_T), intent(inout)                 :: this
     character (len=*), intent(out)                    :: character_str
 
     character_str =  this%s
@@ -210,7 +218,7 @@ contains
 
   subroutine list_finalize_sub(this)
 
-    type (FSTRINGS_T), intent(inout) :: this
+    type (FSTRINGS_T), intent(inout)          :: this
 
     call this%clear()
 
@@ -220,7 +228,7 @@ contains
 
   subroutine deallocate_all_list_items_sub(this)
 
-    class (FSTRINGS_T), intent(inout), target :: this
+    class (FSTRINGS_T), intent(inout)        :: this
 
     ! [ LOCALS ]
     type (FSTRINGS_T), pointer  :: current
@@ -332,11 +340,10 @@ contains
   !
   !   end subroutine list_sort_sub
 
+  elemental function character_to_uppercase_fn(incoming_str)      result(result_str)
 
-  elemental function char_to_uppercase_fn (this)                    result(text)
-
-    class (FSTRINGS_T), intent(in)                    :: this
-    character(len=:), allocatable                     :: text
+    character (len=*), intent(in)                     :: incoming_str
+    character(len=:), allocatable                     :: result_str
 
     ! LOCALS
     integer (c_int) :: indx
@@ -346,15 +353,55 @@ contains
     integer (c_int), parameter :: ASCII_SMALL_A = ichar("a")
     integer (c_int), parameter :: ASCII_SMALL_Z = ichar("z")
 
-    text = this%s
+    result_str = incoming_str
 
-    do indx=1,len_trim(text)
-      if ( ichar(text(indx:indx) ) >= ASCII_SMALL_A .and. ichar(text(indx:indx)) <= ASCII_SMALL_Z ) then
-        text(indx:indx) = char( ichar( text(indx:indx) ) + LOWER_TO_UPPER )
+    do indx=1,len_trim(result_str)
+      if (      ichar(result_str(indx:indx) ) >= ASCII_SMALL_A              &
+          .and. ichar(result_str(indx:indx)) <= ASCII_SMALL_Z ) then
+
+            result_str(indx:indx) = char( ichar( result_str(indx:indx) ) + LOWER_TO_UPPER )
+
       end if
     end do
 
-  end function char_to_uppercase_fn
+  end function character_to_uppercase_fn
 
+
+  function retrieve_value_from_list_at_index_fn(this, index_val)   result(text)
+
+    class (FSTRINGS_T), intent(inout), target         :: this
+    integer (c_int), intent(in)                       :: index_val
+    character(len=:), allocatable                     :: text
+
+    ! [ LOCALS ]
+    type (FSTRINGS_T), pointer                  :: current
+
+    text = "<NA>"
+
+    current => this
+
+    do while (associated(current))
+
+      if ( current%index_val == index_val ) then
+        text = current%s
+        exit
+      endif
+
+      current => current%next
+
+    enddo
+
+  end function retrieve_value_from_list_at_index_fn
+
+
+  function fstring_to_uppercase_fn (this)                    result(text)
+
+    class (FSTRINGS_T), intent(inout)                 :: this
+    character(len=:), allocatable                     :: text(:)
+
+    allocate( character(len=20)::text( this%count()))
+    text(1) = as_uppercase( this%s )
+
+  end function fstring_to_uppercase_fn
 
 end module fstrings
