@@ -246,7 +246,7 @@ contains
   !! @param[in]  degrees     String value.
   !! @retval     is_numeric  True if any numeric values are present in the string.
 
-  logical ( kind=c_bool ) elemental function is_numeric( value )
+  logical ( kind=c_bool ) function is_numeric( value )
 
     character (len=*), intent(in)    :: value
 
@@ -627,7 +627,7 @@ contains
 
   !> Convert a character value into a integer
 
-  elemental function char2int(sValue)  result(iValue)
+  function char2int(sValue)  result(iValue)
 
     character (len=*), intent(in) :: sValue
     integer (kind=c_int) :: iValue
@@ -874,7 +874,7 @@ end function fortran_to_c_string
   !!
   !! Keep only the numeric characters in a text string.
   !! @param[in] sTextIn
-  elemental function keepnumeric(sText1)            result(sText)
+  function keepnumeric(sText1)            result(sText)
 
     ! ARGUMENTS
     character (len=*), intent(in)           :: sText1

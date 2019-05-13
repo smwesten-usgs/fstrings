@@ -205,7 +205,7 @@ contains
   subroutine assign_string_list_to_string_list_sub(slList2, slList1)
 
     type (STRING_LIST_T), intent(out)     :: slList2
-    type (STRING_LIST_T), intent(inout)   :: slList1
+    type (STRING_LIST_T)                  :: slList1
 
     ! [ LOCALS ]
     integer (kind=c_int) :: indx
@@ -282,35 +282,43 @@ contains
     character (len=*), intent(in) :: text
 
     ! [ LOCALS ]
-    type (STRING_LIST_ELEMENT_T), pointer   :: newElement_ptr
-    type (STRING_LIST_ELEMENT_T), pointer   :: oldLastElement_ptr
+    type (STRING_LIST_ELEMENT_T), pointer   :: new_element_ptr
+    type (STRING_LIST_ELEMENT_T), pointer   :: old_last_element_ptr
     integer (kind=c_int)                    :: status
 
-    newElement_ptr => null()
-    allocate(newElement_ptr, stat=status)
+    new_element_ptr => null()
+    allocate(new_element_ptr, stat=status)
     call assert(status == 0, "There was a problem allocating memory for a new string list element", &
         __FILE__, __LINE__)
 
-    newElement_ptr%s    = trim( text )
-    newElement_ptr%next => null()
+    ! create a new list element
+    new_element_ptr%s    = trim( text )
+    new_element_ptr%next => null()
 
+    ! are there already entries in this list?
     if (associated( this%first ) ) then
 
       if (this%count == 0)  call die("Internal logic error: count should *not* be zero in this block", &
           __FILE__, __LINE__)
 
-      oldLastElement_ptr => this%last
-      oldLastElement_ptr%next => newElement_ptr
-      newElement_ptr%previous => oldLastElement_ptr
-      newElement_ptr%indexval = newElement_ptr%previous%indexval + 1
-      this%last      => newElement_ptr
-      this%last%next => null()
+      ! keep track of the current last element in list
+      old_last_element_ptr => this%last
+      ! make the current last element in list point to our new list element
+      old_last_element_ptr%next => new_element_ptr
+
+      ! wire up the new list element so that "previous" points to current last element
+      new_element_ptr%previous => this%last
+      new_element_ptr%indexval = this%last%indexval + 1
+
+      ! now rewire the "last" list entry to point to the newly added list element
+      this%last      => new_element_ptr
 
     else
+      ! no entries; this is the first element in the list
 
-      this%first    => newElement_ptr
-      this%last     => newElement_ptr
-      newElement_ptr%indexval = 1
+      new_element_ptr%indexval = 1
+      this%first    => new_element_ptr
+      this%last     => new_element_ptr
 
     endif
 
@@ -489,7 +497,9 @@ contains
     this%current => this%first
     icount = 0
 
-    do while ( associated( this%current ) .and. icount < this%last%indexVal )
+    do while ( associated( this%current ) )
+
+      if( icount == this%last%indexVal )  exit
 
       icount = icount + 1
 
@@ -547,7 +557,11 @@ contains
     icount = 0
     current => this%first
 
-    do while ( associated( current ) .and. icount < this%last%indexVal )
+    do while ( associated( current ) )
+
+      if (.not. associated(this%last) ) stop ("Null pointer detected in list_update_count")
+
+      if ( icount == this%last%indexVal )  exit
 
       icount = icount + 1
       current => current%next
@@ -578,7 +592,9 @@ contains
 
     sBuf = ""
 
-    do while ( associated( this%current ) .and. icount <= this%count )
+    do while ( associated( this%current ) )
+
+      if ( icount == this%count )  exit
 
       icount = icount + 1
 
@@ -1065,14 +1081,13 @@ contains
         list_right_chunk%last => string_list%last
         list_right_chunk%first => marker
 
-        print *, marker%indexVal
-        print *, marker%previous%indexVal
+!        print *, marker%indexVal
+!        print *, marker%previous%indexVal
 
-        print *, "== LEFT CHUNK =="
-        call list_left_chunk%print()
-        print *, "== RIGHT CHUNK =="
-        call list_right_chunk%print()
-
+!        print *, "== LEFT CHUNK =="
+!        call list_left_chunk%print()
+!        print *, "== RIGHT CHUNK =="
+!        call list_right_chunk%print()
 
 
         call list_sort_sub( list_left_chunk )

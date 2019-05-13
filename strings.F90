@@ -249,7 +249,7 @@ contains
 
   !--------------------------------------------------------------------------------------------------
 
-  elemental function is_char_equal_to_char_case_sensitive_fn(text1, text2)   result(lBool)
+  function is_char_equal_to_char_case_sensitive_fn(text1, text2)   result(lBool)
 
     character (len=*), intent(in)      :: text1
     character (len=*), intent(in)      :: text2
@@ -270,7 +270,7 @@ contains
 
   !--------------------------------------------------------------------------------------------------
 
-  elemental function is_char_equal_to_char_case_insensitive_fn(text1, text2)   result(lBool)
+  function is_char_equal_to_char_case_insensitive_fn(text1, text2)   result(lBool)
 
     character (len=*), intent(in)      :: text1
     character (len=*), intent(in)      :: text2
@@ -339,7 +339,7 @@ contains
 
   !--------------------------------------------------------------------------------------------------
 
-  elemental function short_to_char_fn(value_i)    result(text)
+  function short_to_char_fn(value_i)    result(text)
 
     integer (kind=c_short), intent(in)  :: value_i
     character (len=:), allocatable    :: text
@@ -360,7 +360,7 @@ contains
 
   !--------------------------------------------------------------------------------------------------
 
-  elemental function int_to_char_fn(value_i)    result(text)
+  function int_to_char_fn(value_i)    result(text)
 
     integer (kind=c_int), intent(in)  :: value_i
     character (len=:), allocatable    :: text
@@ -381,7 +381,7 @@ contains
 
   !--------------------------------------------------------------------------------------------------
 
-  elemental function long_long_to_char_fn(value_i)    result(text)
+  function long_long_to_char_fn(value_i)    result(text)
 
     integer (kind=c_long_long), intent(in)  :: value_i
     character (len=:), allocatable          :: text
@@ -402,7 +402,7 @@ contains
 
   !--------------------------------------------------------------------------------------------------
 
-  elemental function float_to_char_fn(fValue, fieldWidth, numDigits)    result(text)
+  function float_to_char_fn(fValue, fieldWidth, numDigits)    result(text)
 
     real (kind=c_float), intent(in)             :: fValue
     integer (kind=c_int), intent(in), optional  :: fieldWidth
@@ -436,7 +436,7 @@ contains
 
   !--------------------------------------------------------------------------------------------------
 
-  elemental function double_to_char_fn(dValue, numDigits)    result(text)
+  function double_to_char_fn(dValue, numDigits)    result(text)
 
     real (kind=c_double), intent(in)             :: dValue
     integer (kind=c_int), intent(in), optional  :: numDigits
@@ -465,7 +465,7 @@ contains
 
   !--------------------------------------------------------------------------------------------------
 
-  elemental function logical_to_char_fn(lValue)    result(text)
+  function logical_to_char_fn(lValue)    result(text)
 
     logical (kind=c_bool), intent(in)    :: lValue
     character (len=:), allocatable       :: text
@@ -480,7 +480,7 @@ contains
 
   !--------------------------------------------------------------------------------------------------
 
-  elemental function squote_char_fn(text1)    result(text)
+  function squote_char_fn(text1)    result(text)
 
     character (len=*), intent(in)         :: text1
     character (len=:), allocatable        :: text
@@ -491,7 +491,7 @@ contains
 
   !--------------------------------------------------------------------------------------------------
 
-  elemental function dquote_char_fn(text1)    result(text)
+  function dquote_char_fn(text1)    result(text)
 
     character (len=*), intent(in)         :: text1
     character (len=:), allocatable        :: text
@@ -502,7 +502,7 @@ contains
 
   !--------------------------------------------------------------------------------------------------
 
-  elemental function char_to_uppercase_fn ( s )                    result(text)
+  function char_to_uppercase_fn ( s )                    result(text)
 
     ! ARGUMENTS
     character (len=*), intent(in) :: s
@@ -528,7 +528,7 @@ contains
 
   !--------------------------------------------------------------------------
 
-  elemental function char_to_lowercase_fn ( s )                  result(text)
+  function char_to_lowercase_fn ( s )                  result(text)
 
     ! ARGUMENTS
     character (len=*), intent(in) :: s
@@ -552,7 +552,7 @@ contains
   end function char_to_lowercase_fn
 
 
-  elemental subroutine char_to_uppercase_sub ( s )
+  subroutine char_to_uppercase_sub ( s )
 
     ! ARGUMENTS
     character (len=*), intent(inout) :: s
@@ -572,7 +572,7 @@ contains
   end subroutine char_to_uppercase_sub
 
 
-  elemental subroutine char_to_lowercase_sub ( s )
+  subroutine char_to_lowercase_sub ( s )
 
     ! ARGUMENTS
     character (len=*), intent(inout) :: s
@@ -592,51 +592,6 @@ contains
     end do
 
   end subroutine char_to_lowercase_sub
-
-  !--------------------------------------------------------------------------
-
-  !> Strip offending characters from a text string.
-  !!
-  !! Remove unwanted characters from a text string. The target characters may optionally be supplied.
-  !! @param[in] textIn
-  function clean(text1, targetCharacters)            result(text)
-
-    ! ARGUMENTS
-    character (len=*), intent(inout)           :: text1
-    character (len=*), intent(in), optional    :: targetCharacters
-    character (len=:), allocatable             :: text
-
-    ! LOCALS
-    character (len=512)            :: sBuf
-    integer (kind=c_int)           :: iR                 ! Index in sRecord
-    integer (kind=c_int)           :: indx1, indx2
-    character (len=:), allocatable :: targetCharacters_
-
-    ! eliminate any leading spaces
-    text1 = adjustl(text1)
-    sBuf = ""
-    indx2 = 0
-
-    if (present(targetCharacters) ) then
-      targetCharacters_ = targetCharacters
-    else
-      targetCharacters_ = ":/;,"
-    endif
-
-    do indx1 = 1,len_trim(text1)
-
-      iR = scan(text1(indx1:indx1), targetCharacters_)
-
-      if(iR==0) then
-        indx2 = indx2 + 1
-        sBuf(indx2:indx2) = text1(indx1:indx1)
-      end if
-
-    enddo
-
-    text = trim(sBuf)
-
-  end function clean
 
   !--------------------------------------------------------------------------------------------------
 

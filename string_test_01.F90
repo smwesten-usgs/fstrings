@@ -31,11 +31,9 @@ program string_test_01
 
     jndx=1
 
-    sl1 = rand()
-
     do indx=1, 10
 
-      fvals = rand()
+      call random_number(fvals)
       call sl1%append( fvals )
 
     enddo
