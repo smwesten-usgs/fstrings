@@ -346,14 +346,14 @@ contains
 
     ! [ LOCALS ]
     integer (kind=c_int) :: iStat
-    character (len=32)   :: sBuf
+    character (len=32)   :: sbuf
 
-    write(sBuf, fmt=*, iostat=iStat)  value_i
+    write(sbuf, fmt=*, iostat=iStat)  value_i
 
     if (iStat==0) then
-      text = trim( adjustl(sBuf) )
+      text = trim( adjustl(sbuf) )
     else
-      text = "NA"
+      text = "<NA>"
     endif
 
   end function short_to_char_fn
@@ -367,14 +367,14 @@ contains
 
     ! [ LOCALS ]
     integer (kind=c_int) :: iStat
-    character (len=32)   :: sBuf
+    character (len=32)   :: sbuf
 
-    write(sBuf, fmt=*, iostat=iStat)  value_i
+    write(sbuf, fmt=*, iostat=iStat)  value_i
 
     if (iStat==0) then
-      text = trim( adjustl(sBuf) )
+      text = trim( adjustl(sbuf) )
     else
-      text = "NA"
+      text = "<NA>"
     endif
 
   end function int_to_char_fn
@@ -388,14 +388,14 @@ contains
 
     ! [ LOCALS ]
     integer (kind=c_int) :: iStat
-    character (len=32)   :: sBuf
+    character (len=32)   :: sbuf
 
-    write(sBuf, fmt=*, iostat=iStat)  value_i
+    write(sbuf, fmt=*, iostat=iStat)  value_i
 
     if (iStat==0) then
-      text = trim( adjustl(sBuf) )
+      text = trim( adjustl(sbuf) )
     else
-      text = "NA"
+      text = "<NA>"
     endif
 
   end function long_long_to_char_fn
@@ -411,25 +411,25 @@ contains
 
     ! [ LOCALS ]
     integer (kind=c_int) :: iStat
-    character (len=32)   :: sFmt
-    character (len=32)   :: sBuf
+    character (len=32)   :: format_str
+    character (len=32)   :: sbuf
 
     if ( present( numDigits) .and. present( fieldWidth ) ) then
-      write(sFmt, fmt="('(G',i0,'.',i0,')')") fieldWidth, numDigits
+      write(format_str, fmt="('(G',i0,'.',i0,')')") fieldWidth, numDigits
     elseif (present(numDigits) ) then
-      write(sFmt, fmt="('(G0.',i0,')')") numDigits
+      write(format_str, fmt="('(G0.',i0,')')") numDigits
     elseif (present(fieldWidth) ) then
-      write(sFmt, fmt="('(G',i0,'.4)')") numDigits
+      write(format_str, fmt="('(G',i0,'.4)')") numDigits
     else
-      sFmt = "(G0.4)"
+      format_str = "(G0.4)"
     endif
 
-    write(sBuf, fmt=trim(sFmt), iostat=iStat)  fValue
+    write(sbuf, fmt=trim(format_str), iostat=iStat)  fValue
 
     if (iStat==0) then
-      text = trim( adjustl(sBuf) )
+      text = trim( adjustl(sbuf) )
     else
-      text = "NA"
+      text = "<NA>"
     endif
 
   end function float_to_char_fn
@@ -444,21 +444,21 @@ contains
 
     ! [ LOCALS ]
     integer (kind=c_int) :: iStat
-    character (len=:), allocatable :: sFmt
-    character (len=32)   :: sBuf
+    character (len=:), allocatable :: format_str
+    character (len=32)   :: sbuf
 
     if (present(numDigits) ) then
-      write(sFmt, fmt="('(G0.',i0,')')") numDigits
+      write(format_str, fmt="('(G0.',i0,')')") numDigits
     else
-      sFmt = "(G0.12)"
+      format_str = "(G0.12)"
     endif
 
-    write(sBuf, fmt=sFmt, iostat=iStat)  dValue
+    write(sbuf, fmt=format_str, iostat=iStat)  dValue
 
     if (iStat==0) then
-      text = trim( adjustl(sBuf) )
+      text = trim( adjustl(sbuf) )
     else
-      text = "NA"
+      text = "<NA>"
     endif
 
   end function double_to_char_fn
@@ -607,7 +607,7 @@ contains
     character (len=:), allocatable :: text
 
     ! LOCALS
-    character (len=256)            :: sBuf
+    character (len=256)            :: sbuf
     integer (kind=c_int)           :: iR                 ! Index in sRecord
     integer (kind=c_int)           :: indx1, indx2
     character (len=1)              :: sChar_
@@ -615,7 +615,7 @@ contains
 
     ! eliminate any leading spaces
     text1 = adjustl(text1)
-    sBuf = ""
+    sbuf = ""
     indx2 = 0
     lPreviouslyFound = FALSE
 
@@ -632,7 +632,7 @@ contains
       if(iR==0) then
         ! sChar_ was not found
         indx2 = indx2 + 1
-        sBuf(indx2:indx2) = text1(indx1:indx1)
+        sbuf(indx2:indx2) = text1(indx1:indx1)
         lPreviouslyFound = FALSE
 
       elseif( lPreviouslyFound ) then
@@ -644,34 +644,34 @@ contains
         ! sChar_ was found, but was *not* found in the preceding position
 
         indx2 = indx2 + 1
-        sBuf(indx2:indx2) = text1(indx1:indx1)
+        sbuf(indx2:indx2) = text1(indx1:indx1)
         lPreviouslyFound = TRUE
 
       end if
 
     enddo
 
-    text = trim(sBuf)
+    text = trim(sbuf)
 
   end function remove_repeats
 
   !--------------------------------------------------------------------------------------------------
 
-  function count_number_of_fields_fn( text, delimiterChars )     result( count_i )
+  function count_number_of_fields_fn( text, delimiter_chr )     result( count_i )
 
     character (len=*), intent(in)               :: text
-    character (len=*), intent(in), optional     :: delimiterChars
+    character (len=*), intent(in), optional     :: delimiter_chr
     integer (kind=c_int)                        :: count_i
 
     ! [ LOCALS ]
     character (len=len(text))      :: text1
     character (len=len(text))      :: text2
-    character (len=:), allocatable  :: delimiterChars_
+    character (len=:), allocatable  :: delimiter_chr_
 
-    if ( present(delimiterChars) ) then
-      delimiterChars_ = delimiterChars_
+    if ( present(delimiter_chr) ) then
+      delimiter_chr_ = delimiter_chr_
     else
-      delimiterChars_ = WHITESPACE
+      delimiter_chr_ = WHITESPACE
     endif
 
     count_i = 0
@@ -679,7 +679,7 @@ contains
     text1 = text
 
     do
-      call chomp(text1=text1, text2=text2, delimiterChars=delimiterChars_ )
+      call chomp(text1=text1, text2=text2, delimiter_chr=delimiter_chr_ )
 
       if ( len_trim( text2 ) == 0 )  exit
 
@@ -691,38 +691,38 @@ contains
 
   !--------------------------------------------------------------------------------------------------
 
-  subroutine split_and_return_text_sub(text1, text2, delimiterChars)
+  subroutine split_and_return_text_sub(text1, text2, delimiter_chr)
 
     character (len=*), intent(inout)                     :: text1
     character (len=*), intent(out)                       :: text2
-    character (len=*), intent(in), optional              :: delimiterChars
+    character (len=*), intent(in), optional              :: delimiter_chr
 
     ! [ LOCALS ]
-    character (len=:), allocatable :: delimiterChars_
+    character (len=:), allocatable :: delimiter_chr_
     integer (kind=c_int) :: iIndex
 
-    if ( present(delimiterChars) ) then
+    if ( present(delimiter_chr) ) then
 
-      select case (delimiterChars)
+      select case (delimiter_chr)
       case ("WHITESPACE")
-        delimiterChars_ = WHITESPACE
+        delimiter_chr_ = WHITESPACE
       case ("TAB", "TABS")
-        delimiterChars_ = TAB
+        delimiter_chr_ = TAB
       case ("COMMA", "CSV")
-        delimiterChars_ = ","
+        delimiter_chr_ = ","
       case default
-        delimiterChars_ = delimiterChars
+        delimiter_chr_ = delimiter_chr
       end select
 
     else
 
-      delimiterChars_ = WHITESPACE
+      delimiter_chr_ = WHITESPACE
 
     endif
 
     text1 = adjustl(text1)
 
-    iIndex = scan( string = text1, set = delimiterChars_ )
+    iIndex = scan( string = text1, set = delimiter_chr_ )
 
     if (iIndex == 0) then
       ! no delimiters found; return string as was supplied originally
@@ -738,11 +738,11 @@ contains
 
   !--------------------------------------------------------------------------------------------------
 
-  subroutine replace_character_sub(text1, findChar, replaceChar)
+  subroutine replace_character_sub(text1, find_chr, replace_chr)
 
     character (len=*), intent(inout)    :: text1
-    character (len=1), intent(in)       :: findChar
-    character (len=1), intent(in)       :: replaceChar
+    character (len=1), intent(in)       :: find_chr
+    character (len=1), intent(in)       :: replace_chr
 
     ! [ LOCALS ]
     integer (kind=c_int) :: iIndex
@@ -751,7 +751,7 @@ contains
 
       do iIndex = 1, len_trim(text1)
 
-        if ( text1(iIndex:iIndex) .eq. findChar)    text1(iIndex:iIndex) = replaceChar
+        if ( text1(iIndex:iIndex) .eq. find_chr)    text1(iIndex:iIndex) = replace_chr
 
       enddo
 
@@ -761,11 +761,11 @@ contains
 
   !--------------------------------------------------------------------------------------------------
 
-  function remove_multiple_characters_fn(text, delimiterChars)                result(text1)
+  function remove_multiple_characters_fn(text, delimiter_chr)                result(text1)
 
     ! ARGUMENTS
     character (len=*), intent(inout)           :: text
-    character (len=*), intent(in), optional    :: delimiterChars
+    character (len=*), intent(in), optional    :: delimiter_chr
     character (len=:), allocatable             :: text1
 
     ! LOCALS
@@ -780,8 +780,8 @@ contains
 
     do i = 1,len_trim(text)
 
-      if(present(delimiterChars)) then
-        iR = scan(text(i:i), delimiterChars)
+      if(present(delimiter_chr)) then
+        iR = scan(text(i:i), delimiter_chr)
       else
         iR = scan(text(i:i),":/;,")
       endif

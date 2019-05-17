@@ -31,7 +31,7 @@ program string_test_01
 
     jndx=1
 
-    do indx=1, 10
+    do indx=1, 12
 
       call random_number(fvals)
       call sl1%append( fvals )
@@ -47,6 +47,6 @@ program string_test_01
   print *, "--- SORTING LIST ---"
 
   call list_sort( sl1 )
-  call sl1%print()
+  !call sl1%print()
 
 end program string_test_01

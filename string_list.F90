@@ -415,7 +415,7 @@ contains
 
     current => this%first
 
-    do while ( associated( this%current ) )
+    do while ( associated( current ) )
 
       icount = icount + 1
 
@@ -1046,11 +1046,13 @@ contains
 
         print *, "++++ PIVOT INDEX: ", pivot_index
         pivot => string_list%get_pointer( pivot_index )
+        if (.not. associated(pivot) )  stop ("Null pointer: pivot")
 
         left => string_list%first
         right => string_list%last
 
-        print *, "l, r: ", left%indexVal, right%indexVal, pivot%indexVal
+        print *, "l, r, pivot: ", left%indexVal, right%indexVal, pivot%indexVal
+        print *, "lv, rv, pivotv: ", left%s, ' | ',right%s, ' | ', pivot%s
 
         do
           do while ( right%s > pivot%s )
@@ -1093,8 +1095,8 @@ contains
         call list_sort_sub( list_left_chunk )
         call list_sort_sub( list_right_chunk )
 
-      end if
+    end if
 
-    end subroutine list_sort_sub
+  end subroutine list_sort_sub
 
 end module string_list

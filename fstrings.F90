@@ -1,6 +1,5 @@
 module fstrings
 
-
   use iso_c_binding
   implicit none
 
@@ -8,38 +7,43 @@ module fstrings
 
   public :: FSTRINGS_T
 
-  public :: operator(+)
-  interface operator(+)
-    procedure :: concatenate_character_character_fn
-!    procedure :: concatenate_char_int_fn
-!    procedure :: concatenate_char_float_fn
-!    procedure :: concatenate_char_double_fn
-  end interface operator(+)
+  public :: assignment(=)
+  interface assignment(=)
+    module procedure   :: assign_fstring_to_character_sub
+  end interface assignment(=)
 
-  public :: as_uppercase
-  interface as_uppercase
-    procedure :: character_to_uppercase_fn
-  end interface as_uppercase
+  private::f_to_c_str
+  interface f_to_c_str
+    module procedure :: f_to_c_string_fn
+  end interface f_to_c_str
+
+  private::c_to_f_str
+  interface c_to_f_str
+    module procedure :: c_to_f_string_fn
+  end interface c_to_f_str
+
+  public::chomp
+  interface chomp
+    module procedure :: split_and_return_text_sub
+  end interface chomp
 
   type FSTRINGS_T
 
     character (len=:), allocatable        :: s
-    type (FSTRINGS_T), pointer            :: previous  => null()
-    type (FSTRINGS_T), pointer            :: next      => null()
-    integer (c_int)                       :: index_val
+    integer (c_int)                       :: str_count
 
   contains
 
-!    procedure   :: assign_fstring_to_character_sub
     procedure   :: assign_character_to_fstring_sub
     generic     :: assignment(=) => assign_character_to_fstring_sub
-!                                    assign_fstring_to_character_sub
 
     procedure   :: print_all_entries_sub
     generic     :: print_all => print_all_entries_sub
 
     procedure   :: append_character_to_fstring_sub
-    generic     :: append => append_character_to_fstring_sub
+    procedure   :: append_character_array_to_fstring_sub
+    generic     :: append => append_character_to_fstring_sub,                   &
+                             append_character_array_to_fstring_sub
 
     procedure   :: count_strings_in_list_fn
     generic     :: count => count_strings_in_list_fn
@@ -47,13 +51,34 @@ module fstrings
     procedure   :: retrieve_value_from_list_at_index_fn
     generic     :: get => retrieve_value_from_list_at_index_fn
 
-    procedure   :: deallocate_all_list_items_sub
-    generic     :: clear => deallocate_all_list_items_sub
+    procedure   :: retrieve_values_as_integer_fn
+    generic     :: get_integer => retrieve_values_as_integer_fn
 
-    procedure   :: fstring_to_uppercase_fn
-    generic     :: upper => fstring_to_uppercase_fn
+    procedure   :: retrieve_values_as_float_fn
+    generic     :: get_float => retrieve_values_as_float_fn
+
+    procedure   :: retrieve_values_as_double_fn
+    generic     :: get_double => retrieve_values_as_double_fn
+
+    procedure   :: retrieve_values_as_logical_fn
+    generic     :: get_logical => retrieve_values_as_logical_fn
+
+    procedure   :: quicksort_sub
+    generic     :: sort => quicksort_sub
+
+    procedure   :: clear_list_sub
+    generic     :: clear => clear_list_sub
 
   end type FSTRINGS_T
+
+  type SORT_GROUP_T
+      integer                       :: order    ! original order of unsorted data
+      character(len=:), allocatable :: value    ! values to be sorted by
+  end type SORT_GROUP_T
+
+  integer (c_int), parameter  :: NA_INT    = - (huge(1_c_int)-1_c_int)
+  real (c_float), parameter   :: NA_FLOAT  = - (huge(1._c_float)-1._c_float)
+  real (c_double), parameter  :: NA_DOUBLE = - (huge(1._c_double)-1._c_double)
 
 contains
 
@@ -72,6 +97,7 @@ contains
 
   end function c_to_f_string_fn
 
+!--------------------------------------------------------------------------------------------------
 
   function f_to_c_string_fn(f_character_str)   result(c_character_str)
 
@@ -82,6 +108,7 @@ contains
 
   end function f_to_c_string_fn
 
+!--------------------------------------------------------------------------------------------------
 
   subroutine assign_character_to_fstring_sub(this, character_str)
 
@@ -90,41 +117,35 @@ contains
 
     call this%clear()
 
-    this%index_val = 1
-    this%s = character_str//c_null_char
+    this%s = c_to_f_str(trim(character_str))//c_null_char
+    this%str_count = 1
 
   end subroutine assign_character_to_fstring_sub
 
 !--------------------------------------------------------------------------------------------------
 
-  subroutine assign_fstring_to_character_sub(this, character_str)
+  subroutine assign_fstring_to_character_sub(character_str, this)
 
-    class (FSTRINGS_T), intent(inout)                 :: this
-    character (len=*), intent(out)                    :: character_str
+    character (len=:), allocatable, intent(out)      :: character_str
+    type (FSTRINGS_T), intent(inout)                 :: this
 
-    character_str =  this%s
+    character_str = this%get(1)
 
   end subroutine assign_fstring_to_character_sub
 
 !--------------------------------------------------------------------------------------------------
 
-  function count_strings_in_list_fn(this)        result(counter)
+  function count_strings_in_list_fn(this)        result(str_count)
 
     class (FSTRINGS_T), intent(inout), target        :: this
-    integer (c_int)                                  :: counter
+    integer (c_int)                                  :: str_count
 
-    ! [ LOCALS ]
-    type (FSTRINGS_T), pointer                       :: current
+    integer (c_int) :: i
 
-    counter = 0
+    str_count = 0
 
-    current => this
-
-    do while (associated(current))
-
-      counter = counter + 1
-      current => current%next
-
+    do i=1, len_trim(this%s)
+      if( this%s(i:i) == c_null_char ) str_count = str_count + 1
     enddo
 
   end function count_strings_in_list_fn
@@ -136,46 +157,28 @@ contains
     class (FSTRINGS_T), intent(inout), target        :: this
     character (len=*), intent(in)                    :: character_str
 
-    ! [ LOCALS ]
-    type (FSTRINGS_T), pointer                       :: current
-    type (FSTRINGS_T), pointer                       :: last
-    type (FSTRINGS_T), pointer                       :: previous
-    type (FSTRINGS_T), pointer                       :: new
-
-    allocate(new)
-
-    new%s = character_str
-    new%next => null()
-
-    if ( associated(this%next) ) then
-
-      current => this%next
-
-      do while ( associated(current) )
-
-        last => current
-        previous => current%previous
-        current => current%next
-
-      enddo
-
-!      last%previous => previous
-      last%next => new
-      !! crash here
-!      if (associated( previous) )   last%index_val = previous%index_val + 1
-
-      new%previous => last
-      new%index_val = new%previous%index_val + 1
-
-    else
-
-      this%next    => new
-      new%previous => this
-      new%index_val = this%index_val + 1
-
-    endif
+    this%s = trim(this%s)//trim(adjustl(c_to_f_str(character_str)))//c_null_char
+    this%str_count = this%str_count + 1
 
   end subroutine append_character_to_fstring_sub
+
+!--------------------------------------------------------------------------------------------------
+
+subroutine append_character_array_to_fstring_sub(this, character_str)
+
+  class (FSTRINGS_T), intent(inout), target        :: this
+  character (len=*), intent(in)                    :: character_str(:)
+
+  integer (c_int) :: i
+
+  do i=1, size(character_str,1)
+
+    this%s = trim(this%s)//trim(adjustl(c_to_f_str(character_str(i))))//c_null_char
+    this%str_count = this%str_count + 1
+
+  enddo
+
+end subroutine append_character_array_to_fstring_sub
 
 !--------------------------------------------------------------------------------------------------
 
@@ -183,36 +186,26 @@ contains
 
     class (FSTRINGS_T), intent(inout), target   :: this
 
-    ! [ LOCALS ]
-    type (FSTRINGS_T), pointer                  :: current
-    integer (c_int)                             :: counter
+    character (len=:), allocatable :: sbuf
+    integer (c_int)                :: start_pos
+    integer (c_int)                :: end_pos
+    integer (c_int)                :: str_len
+    integer (c_int)                :: i
 
-    counter = 0
+    start_pos = 1
+    end_pos = index( this%s, c_null_char ) - 1
+    str_len = len_trim( this%s )
 
-    current => this
+    do i=1, this%count()
 
-    do while (associated(current))
+      write(*,fmt="(a)") this%s(start_pos:end_pos)
 
-      counter = counter + 1
+      start_pos = end_pos + 2
+      end_pos = index( this%s(start_pos:str_len), c_null_char ) + start_pos - 2
 
-      print *, current%index_val, current%s
-      current => current%next
-
-    enddo
+    end do
 
   end subroutine print_all_entries_sub
-
-!--------------------------------------------------------------------------------------------------
-
-  function concatenate_character_character_fn(character_str1, character_str2)  result(character_str)
-
-    character (len=*), intent(in)       :: character_str1
-    character (len=*), intent(in)       :: character_str2
-    character (len=:), allocatable      :: character_str
-
-    character_str = character_str1//character_str2
-
-  end function concatenate_character_character_fn
 
 !--------------------------------------------------------------------------------------------------
 
@@ -226,182 +219,277 @@ contains
 
 !--------------------------------------------------------------------------------------------------
 
-  subroutine deallocate_all_list_items_sub(this)
+  subroutine clear_list_sub(this)
 
     class (FSTRINGS_T), intent(inout)        :: this
 
-    ! [ LOCALS ]
-    type (FSTRINGS_T), pointer  :: current
-    type (FSTRINGS_T), pointer  :: toremove
+    this%s = ""
+    this%str_count = 0
 
-    current => this%next
-    toremove => null()
-
-    do while ( associated( current ) )
-
-      toremove => current
-
-      current => current%next
-
-      if ( allocated( toremove%s ) )  deallocate( toremove%s )
-
-      if ( associated( toremove ) )  deallocate( toremove )
-
-    enddo
-
-    if ( allocated( this%s ) )  deallocate( this%s )
-    this%next => null()
-
-  end subroutine deallocate_all_list_items_sub
+  end subroutine clear_list_sub
 
 !--------------------------------------------------------------------------------------------------
 
-  ! recursive subroutine list_sort_sub(this)
-  !
-  !   class (FSTRINGS_T), intent(inout), target :: this
-  !
-  !   ! [ LOCALS ]
-  !   type (FSTRINGS_T), pointer :: left
-  !   type (FSTRINGS_T), pointer :: right
-  !   type (FSTRINGS_T), pointer :: pivot
-  !   type (FSTRINGS_T), pointer :: marker
-  !   type (STRING_LIST_T)                  :: list_left_chunk
-  !   type (STRING_LIST_T)                  :: list_right_chunk
-  !
-  !   real (kind=c_float)  :: random_value
-  !   integer (kind=c_int) :: pivot_index
-  !   integer (kind=c_int) :: itemCount
-  !   integer (kind=c_int) :: minIndex
-  !   integer (kind=c_int) :: maxIndex
-  !
-  !   itemCount = this%count()
-  !
-  !   minIndex = string_list%first%indexVal
-  !   maxIndex = string_list%last%indexVal
-  !
-  !   print *, "+++ ITEM COUNT: ", itemCount
-  !
-  !   if (itemCount > 1) then
-  !
-  !       call random_number(random_value)
-  !       pivot_index = int( 1 + random_value * (itemCount-1), kind=c_int )
-  !
-  !       print *, "++++ PIVOT INDEX: ", pivot_index
-  !       pivot => string_list%get_pointer( pivot_index )
-  !
-  !       left => string_list%first
-  !       right => string_list%last
-  !
-  !       print *, "l, r: ", left%indexVal, right%indexVal, pivot%indexVal
-  !
-  !       do
-  !         do while ( right%s > pivot%s )
-  !           print *, right%s, pivot%s
-  !           if ( associated( right%previous ) )  right => right%previous
-  !         end do
-  !
-  !         do while ( left%s < pivot%s )
-  !           print *, left%s, pivot%s
-  !           if ( associated( left%next ) )   left => left%next
-  !         end do
-  !
-  !         if ( left%s < right%s )   call swap_list_values( left, right )
-  !
-  !         exit
-  !
-  !       end do
-  !
-  !       if (left%s == right%s) then
-  !           if ( associated( left%next ) )   marker => left%next
-  !       else
-  !           marker => left
-  !       end if
-  !
-  !       list_left_chunk%first => string_list%first
-  !       if ( associated( marker%previous) )  list_left_chunk%last => marker%previous
-  !
-  !       list_right_chunk%last => string_list%last
-  !       list_right_chunk%first => marker
-  !
-  !       print *, marker%indexVal
-  !       print *, marker%previous%indexVal
-  !
-  !       print *, "== LEFT CHUNK =="
-  !       call list_left_chunk%print()
-  !       print *, "== RIGHT CHUNK =="
-  !       call list_right_chunk%print()
-  !
-  !
-  !
-  !       call list_sort_sub( list_left_chunk )
-  !       call list_sort_sub( list_right_chunk )
-  !
-  !     end if
-  !
-  !   end subroutine list_sort_sub
+  function retrieve_values_as_integer_fn(this)   result(values)
 
-  elemental function character_to_uppercase_fn(incoming_str)      result(result_str)
+    class (FSTRINGS_T), intent(inout)         :: this
+    integer (c_int), allocatable              :: values(:)
 
-    character (len=*), intent(in)                     :: incoming_str
-    character(len=:), allocatable                     :: result_str
+    integer (c_int)    :: i
+    integer (c_int)    :: value
+    integer (c_int)    :: op_status
+    character (len=64) :: sbuf
 
-    ! LOCALS
-    integer (c_int) :: indx
+    allocate(values(this%str_count),stat=op_status)
 
-    ! CONSTANTS
-    integer (c_int), parameter :: LOWER_TO_UPPER = -32
-    integer (c_int), parameter :: ASCII_SMALL_A = ichar("a")
-    integer (c_int), parameter :: ASCII_SMALL_Z = ichar("z")
+    do i=1,this%str_count
+      sbuf = this%get(i)
+      read(unit=sbuf, fmt=*, iostat=op_status) value
+      if ( op_status==0 ) then
+        values(i) = value
+      else
+        values(i) = NA_INT
+      endif
+    enddo
 
-    result_str = incoming_str
+  end function retrieve_values_as_integer_fn
 
-    do indx=1,len_trim(result_str)
-      if (      ichar(result_str(indx:indx) ) >= ASCII_SMALL_A              &
-          .and. ichar(result_str(indx:indx)) <= ASCII_SMALL_Z ) then
+!--------------------------------------------------------------------------------------------------
 
-            result_str(indx:indx) = char( ichar( result_str(indx:indx) ) + LOWER_TO_UPPER )
+  function retrieve_values_as_float_fn(this)   result(values)
 
-      end if
-    end do
+    class (FSTRINGS_T), intent(inout)         :: this
+    real (c_float), allocatable               :: values(:)
 
-  end function character_to_uppercase_fn
+    integer (c_int)    :: i
+    real (c_float)     :: value
+    integer (c_int)    :: op_status
+    character (len=64) :: sbuf
 
+    allocate(values(this%str_count),stat=op_status)
+
+    do i=1,this%str_count
+      sbuf = this%get(i)
+      read(unit=sbuf, fmt=*, iostat=op_status) value
+      if ( op_status==0 ) then
+        values(i) = value
+      else
+        values(i) = NA_FLOAT
+      endif
+    enddo
+
+  end function retrieve_values_as_float_fn
+
+!--------------------------------------------------------------------------------------------------
+
+function retrieve_values_as_double_fn(this)   result(values)
+
+  class (FSTRINGS_T), intent(inout)         :: this
+  real (c_double), allocatable              :: values(:)
+
+  integer (c_int)    :: i
+  real (c_double)    :: value
+  integer (c_int)    :: op_status
+  character (len=64) :: sbuf
+
+  allocate(values(this%str_count),stat=op_status)
+
+  do i=1,this%str_count
+    sbuf = this%get(i)
+    read(unit=sbuf, fmt=*, iostat=op_status) value
+    if ( op_status==0 ) then
+      values(i) = value
+    else
+      values(i) = NA_DOUBLE
+    endif
+  enddo
+
+end function retrieve_values_as_double_fn
+
+!--------------------------------------------------------------------------------------------------
+
+function retrieve_values_as_logical_fn(this)   result(values)
+
+  class (FSTRINGS_T), intent(inout)         :: this
+  logical (c_bool), allocatable             :: values(:)
+
+  integer (c_int)    :: i
+  logical (c_bool)   :: value
+  integer (c_int)    :: op_status
+  character (len=64) :: sbuf
+
+  allocate(values(this%str_count),stat=op_status)
+
+  do i=1,this%str_count
+    sbuf = this%get(i)
+
+    select case(sbuf)
+
+      case("true","T","True","TRUE","1","Y","Yes","yes","YES")
+        values(i) = .TRUE._c_bool
+      case default
+        values(i) = .FALSE._c_bool
+
+    end select
+
+  enddo
+
+end function retrieve_values_as_logical_fn
+
+!--------------------------------------------------------------------------------------------------
 
   function retrieve_value_from_list_at_index_fn(this, index_val)   result(text)
 
-    class (FSTRINGS_T), intent(inout), target         :: this
-    integer (c_int), intent(in)                       :: index_val
-    character(len=:), allocatable                     :: text
+    class (FSTRINGS_T), intent(inout)         :: this
+    integer (c_int), intent(in)               :: index_val
+    character(len=:), allocatable             :: text
 
-    ! [ LOCALS ]
-    type (FSTRINGS_T), pointer                  :: current
+    integer (c_int)                :: start_pos
+    integer (c_int)                :: end_pos
+    integer (c_int)                :: str_len
+    integer (c_int)                :: i
+
+    start_pos = 1
+    end_pos = index( this%s, c_null_char ) - 1
+    str_len = len_trim( this%s )
 
     text = "<NA>"
 
-    current => this
+    do i=1, this%str_count
 
-    do while (associated(current))
-
-      if ( current%index_val == index_val ) then
-        text = current%s
+      if ( index_val == i ) then
+        text = this%s(start_pos:end_pos)
         exit
       endif
 
-      current => current%next
+      ! skip over the 'c_null_char' to position of beginning of
+      ! next substring
+      start_pos = end_pos + 2
+      end_pos = index( this%s(start_pos:str_len), c_null_char ) + start_pos - 2
 
-    enddo
+    end do
 
   end function retrieve_value_from_list_at_index_fn
 
+!--------------------------------------------------------------------------------------------------
 
-  function fstring_to_uppercase_fn (this)                    result(text)
+  subroutine quicksort_sub(this)
 
-    class (FSTRINGS_T), intent(inout)                 :: this
-    character(len=:), allocatable                     :: text(:)
+    class (FSTRINGS_T), intent(inout)         :: this
 
-    allocate( character(len=20)::text( this%count()))
-    text(1) = as_uppercase( this%s )
+    type (SORT_GROUP_T), allocatable :: sort_group(:)
+    integer (c_int)                  :: i
+    integer (c_int)                  :: str_count
 
-  end function fstring_to_uppercase_fn
+    str_count = this%str_count
+
+    allocate(sort_group(str_count))
+
+    ! create the 'sort_group' data structure
+    do i=1, str_count
+      sort_group(i)%order = i
+      sort_group(i)%value = this%get(i)
+    enddo
+
+    call qsort(sort_group, this%str_count)
+
+    ! wipe out previous values
+    call this%clear()
+
+    ! copy sorted values back into list structure
+    do i=1, str_count
+      call this%append(sort_group(i)%value)
+    enddo
+
+  end subroutine quicksort_sub
+
+!--------------------------------------------------------------------------------------------------
+
+  recursive subroutine qsort(sort_group, nrec)
+
+  ! NOTE: this code based on code found here:
+  !       https://rosettacode.org/wiki/Sorting_algorithms/Quicksort#Fortran
+
+  ! DUMMY ARGUMENTS
+  type (SORT_GROUP_T), dimension(nrec), intent(in out) :: sort_group
+  integer (c_int), intent(in)                          :: nrec
+
+  ! LOCAL VARIABLES
+  integer                          :: left, right
+  real                             :: random
+  character (len=:), allocatable   :: pivot
+  type (SORT_GROUP_T)              :: temp
+  integer                          :: marker
+
+      if (nrec > 1) then
+
+          call random_number(random)
+          pivot = sort_group(int(random*real(nrec-1))+1)%value   ! random pivor (not best performance, but avoids worst-case)
+          left = 0
+          right = nrec + 1
+
+          do while (left < right)
+              right = right - 1
+              do while (sort_group(right)%value > pivot)
+                  right = right - 1
+              end do
+              left = left + 1
+              do while (sort_group(left)%value < pivot)
+                  left = left + 1
+              end do
+              if (left < right) then
+                  temp = sort_group(left)
+                  sort_group(left) = sort_group(right)
+                  sort_group(right) = temp
+              end if
+          end do
+
+          if (left == right) then
+              marker = left + 1
+          else
+              marker = left
+          end if
+
+          call qsort(sort_group(:marker-1),marker-1)
+          call qsort(sort_group(marker:),nrec-marker+1)
+
+      end if
+
+  end subroutine qsort
+
+!--------------------------------------------------------------------------------------------------
+
+  subroutine split_and_return_text_sub(str, substr, delimiter_chr)
+
+    character (len=*), intent(inout)                     :: str
+    character (len=*), intent(out)                       :: substr
+    character (len=*), intent(in), optional              :: delimiter_chr
+
+    ! [ LOCALS ]
+    character (len=:), allocatable :: delimiter_chr_
+    integer (kind=c_int) :: iIndex
+
+    if ( present(delimiter_chr) ) then
+      delimiter_chr_ = delimiter_chr
+    else
+      delimiter_chr_ = ","
+    endif
+
+    str = adjustl(str)
+
+    iIndex = scan( string = str, set = delimiter_chr_ )
+
+    if (iIndex == 0) then
+      ! no delimiters found; return string as was supplied originally
+      substr = str
+      str = ""
+    else
+      ! delimiters were found; split and return the chunks of text
+      substr = trim( str(1:iIndex-1) )
+      str = trim( adjustl( str(iIndex + 1:) ) )
+    endif
+
+  end subroutine split_and_return_text_sub
+
 
 end module fstrings
