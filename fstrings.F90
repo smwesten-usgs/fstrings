@@ -22,15 +22,26 @@ module fstrings
     module procedure :: c_to_f_string_fn
   end interface c_to_f_str
 
+  private::as_character
+  interface as_character
+    module procedure :: int_to_char_fn
+    module procedure :: float_to_char_fn
+  end interface as_character
+
   public::chomp
   interface chomp
     module procedure :: split_and_return_text_sub
   end interface chomp
 
+  public::split
+  interface split
+    module procedure :: split_character_into_fstring_list_fn
+  end interface split
+
   type FSTRINGS_T
 
     character (len=:), allocatable        :: s
-    integer (c_int)                       :: str_count
+    integer (c_int)                       :: str_count = 0
 
   contains
 
@@ -63,22 +74,38 @@ module fstrings
     procedure   :: retrieve_values_as_logical_fn
     generic     :: get_logical => retrieve_values_as_logical_fn
 
-    procedure   :: quicksort_sub
-    generic     :: sort => quicksort_sub
+    procedure   :: quicksort_alpha_sub
+    generic     :: sort => quicksort_alpha_sub
+
+    procedure   :: quicksort_int_sub
+    generic     :: sort_integer => quicksort_int_sub
+
+    procedure   :: quicksort_float_sub
+    generic     :: sort_float => quicksort_float_sub
 
     procedure   :: clear_list_sub
     generic     :: clear => clear_list_sub
 
   end type FSTRINGS_T
 
-  type SORT_GROUP_T
-      integer                       :: order    ! original order of unsorted data
-      character(len=:), allocatable :: value    ! values to be sorted by
-  end type SORT_GROUP_T
-
   integer (c_int), parameter  :: NA_INT    = - (huge(1_c_int)-1_c_int)
   real (c_float), parameter   :: NA_FLOAT  = - (huge(1._c_float)-1._c_float)
   real (c_double), parameter  :: NA_DOUBLE = - (huge(1._c_double)-1._c_double)
+
+  type ALPHA_SORT_GROUP_T
+    integer (c_int)                :: order
+    character (len=:), allocatable :: alpha_value
+  end type ALPHA_SORT_GROUP_T
+
+  type INT_SORT_GROUP_T
+    integer (c_int)                :: order
+    integer (c_int)                :: int_value
+  end type INT_SORT_GROUP_T
+
+  type FLOAT_SORT_GROUP_T
+    integer (c_int)                :: order
+    real (c_float)                 :: float_value
+  end type FLOAT_SORT_GROUP_T
 
 contains
 
@@ -135,6 +162,38 @@ contains
 
 !--------------------------------------------------------------------------------------------------
 
+  function split_character_into_fstring_list_fn(character_str, delimiter_chr)   result(new_fstring)
+
+    character (len=*), intent(in)                    :: character_str
+    character (len=1), intent(in), optional          :: delimiter_chr
+    type (FSTRINGS_T)                                :: new_fstring
+
+    character (len=len(character_str))  :: string
+    character (len=len(character_str))  :: substring
+    character (len=1)                   :: delimiter_chr_
+
+    if ( present(delimiter_chr) ) then
+      delimiter_chr_ = delimiter_chr
+    else
+      delimiter_chr_ = ","
+    endif
+
+    string = character_str
+
+    do
+
+      call chomp(string, substring, delimiter_chr_)
+
+      if ( len_trim(substring) == 0 ) exit
+
+      call new_fstring%append( substring )
+
+    end do
+
+  end function split_character_into_fstring_list_fn
+
+!--------------------------------------------------------------------------------------------------
+
   function count_strings_in_list_fn(this)        result(str_count)
 
     class (FSTRINGS_T), intent(inout), target        :: this
@@ -157,6 +216,7 @@ contains
     class (FSTRINGS_T), intent(inout), target        :: this
     character (len=*), intent(in)                    :: character_str
 
+    if ( .not. allocated( this%s ) )  this%s = ""
     this%s = trim(this%s)//trim(adjustl(c_to_f_str(character_str)))//c_null_char
     this%str_count = this%str_count + 1
 
@@ -373,13 +433,25 @@ end function retrieve_values_as_logical_fn
 
 !--------------------------------------------------------------------------------------------------
 
-  subroutine quicksort_sub(this)
+  subroutine quicksort_alpha_sub(this, sort_order)
 
     class (FSTRINGS_T), intent(inout)         :: this
+    character (len=*), intent(in), optional   :: sort_order
 
-    type (SORT_GROUP_T), allocatable :: sort_group(:)
-    integer (c_int)                  :: i
-    integer (c_int)                  :: str_count
+    type (ALPHA_SORT_GROUP_T), allocatable :: sort_group(:)
+    integer (c_int)                        :: i
+    integer (c_int)                        :: str_count
+    logical (c_bool)                       :: decreasing_order
+
+    decreasing_order = .false._c_bool
+
+    if ( present(sort_order) ) then
+      select case (sort_order)
+
+      case ("Decreasing","decreasing","DECREASING")
+        decreasing_order = .true._c_bool
+      end select
+    endif
 
     str_count = this%str_count
 
@@ -388,53 +460,164 @@ end function retrieve_values_as_logical_fn
     ! create the 'sort_group' data structure
     do i=1, str_count
       sort_group(i)%order = i
-      sort_group(i)%value = this%get(i)
+      sort_group(i)%alpha_value = this%get(i)
     enddo
 
-    call qsort(sort_group, this%str_count)
+    call qsort_alpha(sort_group, this%str_count)
 
     ! wipe out previous values
     call this%clear()
 
-    ! copy sorted values back into list structure
+    if ( decreasing_order ) then
+      ! copy sorted values back into list structure (DECREASING ORDER)
+      do i=str_count, 1, -1
+        call this%append(sort_group(i)%alpha_value)
+      enddo
+    else
+      ! copy sorted values back into list structure (INCREASING ORDER)
+      do i=1, str_count
+        call this%append(sort_group(i)%alpha_value)
+      enddo
+    endif
+
+  end subroutine quicksort_alpha_sub
+
+!-------------------------------------------------------------------------------------------------
+
+  subroutine quicksort_int_sub(this, sort_order)
+    class (FSTRINGS_T), intent(inout)         :: this
+    character (len=*), intent(in), optional   :: sort_order
+
+    type (INT_SORT_GROUP_T), allocatable   :: sort_group(:)
+    integer (c_int), allocatable           :: int_values(:)
+    integer (c_int)                        :: i
+    integer (c_int)                        :: str_count
+    logical (c_bool)                       :: decreasing_order
+
+    decreasing_order = .false._c_bool
+
+    if ( present(sort_order) ) then
+      select case (sort_order)
+      case ("Decreasing","decreasing","DECREASING")
+        decreasing_order = .true._c_bool
+      end select
+    endif
+
+    str_count = this%str_count
+
+    allocate(sort_group(str_count))
+    allocate(int_values(str_count))
+
+    int_values = this%get_integer()
+
+    ! create the 'sort_group' data structure
     do i=1, str_count
-      call this%append(sort_group(i)%value)
+      sort_group(i)%order = i
+      sort_group(i)%int_value = int_values(i)
     enddo
 
-  end subroutine quicksort_sub
+    call qsort_int(sort_group, this%str_count)
+    ! wipe out previous values
+    call this%clear()
+    if ( decreasing_order ) then
+      ! copy sorted values back into list structure (DECREASING ORDER)
+      do i=str_count, 1, -1
+        call this%append( as_character(sort_group(i)%int_value) )
+      enddo
+    else
+      ! copy sorted values back into list structure (INCREASING ORDER)
+      do i=1, str_count
+        call this%append( as_character(sort_group(i)%int_value) )
+      enddo
+    endif
+  end subroutine quicksort_int_sub
 
-!--------------------------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------------------------
 
-  recursive subroutine qsort(sort_group, nrec)
+  subroutine quicksort_float_sub(this, sort_order)
+
+    class (FSTRINGS_T), intent(inout)         :: this
+    character (len=*), intent(in), optional   :: sort_order
+
+    type (FLOAT_SORT_GROUP_T), allocatable :: sort_group(:)
+    real (c_float), allocatable            :: float_values(:)
+    integer (c_int)                        :: i
+    integer (c_int)                        :: str_count
+    logical (c_bool)                       :: decreasing_order
+
+    decreasing_order = .false._c_bool
+
+    if ( present(sort_order) ) then
+      select case (sort_order)
+
+        case ("Decreasing","decreasing","DECREASING")
+          decreasing_order = .true._c_bool
+      end select
+    endif
+
+    str_count = this%str_count
+
+    allocate(sort_group(str_count))
+
+    float_values = this%get_float()
+
+    ! create the 'sort_group' data structure
+    do i=1, str_count
+      sort_group(i)%order = i
+      sort_group(i)%float_value = float_values(i)
+    enddo
+
+    call qsort_float(sort_group, this%str_count)
+
+    ! wipe out previous values
+    call this%clear()
+
+    if ( decreasing_order ) then
+      ! copy sorted values back into list structure (DECREASING ORDER)
+      do i=str_count, 1, -1
+        call this%append( as_character(sort_group(i)%float_value) )
+      enddo
+    else
+      ! copy sorted values back into list structure (INCREASING ORDER)
+      do i=1, str_count
+        call this%append( as_character(sort_group(i)%float_value) )
+      enddo
+    endif
+
+  end subroutine quicksort_float_sub
+
+!-------------------------------------------------------------------------------------------------
+
+  recursive subroutine qsort_alpha(sort_group, nrec)
 
   ! NOTE: this code based on code found here:
   !       https://rosettacode.org/wiki/Sorting_algorithms/Quicksort#Fortran
 
   ! DUMMY ARGUMENTS
-  type (SORT_GROUP_T), dimension(nrec), intent(in out) :: sort_group
-  integer (c_int), intent(in)                          :: nrec
+  type (ALPHA_SORT_GROUP_T), dimension(nrec), intent(in out) :: sort_group
+  integer (c_int), intent(in)                                :: nrec
 
   ! LOCAL VARIABLES
-  integer                          :: left, right
-  real                             :: random
+  integer (c_int)                  :: left, right
+  real (c_float)                   :: random
   character (len=:), allocatable   :: pivot
-  type (SORT_GROUP_T)              :: temp
-  integer                          :: marker
+  type (ALPHA_SORT_GROUP_T)        :: temp
+  integer (c_int)                  :: marker
 
       if (nrec > 1) then
 
           call random_number(random)
-          pivot = sort_group(int(random*real(nrec-1))+1)%value   ! random pivor (not best performance, but avoids worst-case)
+          pivot = sort_group(int(random*real(nrec-1))+1)%alpha_value   ! random pivor (not best performance, but avoids worst-case)
           left = 0
           right = nrec + 1
 
           do while (left < right)
               right = right - 1
-              do while (sort_group(right)%value > pivot)
+              do while (sort_group(right)%alpha_value > pivot)
                   right = right - 1
               end do
               left = left + 1
-              do while (sort_group(left)%value < pivot)
+              do while (sort_group(left)%alpha_value < pivot)
                   left = left + 1
               end do
               if (left < right) then
@@ -450,12 +633,120 @@ end function retrieve_values_as_logical_fn
               marker = left
           end if
 
-          call qsort(sort_group(:marker-1),marker-1)
-          call qsort(sort_group(marker:),nrec-marker+1)
+          call qsort_alpha(sort_group(:marker-1),marker-1)
+          call qsort_alpha(sort_group(marker:),nrec-marker+1)
 
       end if
 
-  end subroutine qsort
+  end subroutine qsort_alpha
+
+!--------------------------------------------------------------------------------------------------
+
+  recursive subroutine qsort_int(sort_group, nrec)
+
+  ! NOTE: this code based on code found here:
+  !       https://rosettacode.org/wiki/Sorting_algorithms/Quicksort#Fortran
+
+  ! DUMMY ARGUMENTS
+  type (INT_SORT_GROUP_T), dimension(nrec), intent(in out) :: sort_group
+  integer (c_int), intent(in)                              :: nrec
+
+  ! LOCAL VARIABLES
+  integer (c_int)                  :: left, right
+  real (c_float)                   :: random
+  integer (c_int)                  :: pivot
+  type (INT_SORT_GROUP_T)          :: temp
+  integer (c_int)                  :: marker
+
+      if (nrec > 1) then
+
+          call random_number(random)
+          pivot = sort_group(int(random*real(nrec-1))+1)%int_value   ! random pivor (not best performance, but avoids worst-case)
+          left = 0
+          right = nrec + 1
+
+          do while (left < right)
+              right = right - 1
+              do while (sort_group(right)%int_value > pivot)
+                  right = right - 1
+              end do
+              left = left + 1
+              do while (sort_group(left)%int_value < pivot)
+                  left = left + 1
+              end do
+              if (left < right) then
+                  temp = sort_group(left)
+                  sort_group(left) = sort_group(right)
+                  sort_group(right) = temp
+              end if
+          end do
+
+          if (left == right) then
+              marker = left + 1
+          else
+              marker = left
+          end if
+
+          call qsort_int(sort_group(:marker-1),marker-1)
+          call qsort_int(sort_group(marker:),nrec-marker+1)
+
+      end if
+
+  end subroutine qsort_int
+
+!--------------------------------------------------------------------------------------------------
+
+  recursive subroutine qsort_float(sort_group, nrec)
+
+  ! NOTE: this code based on code found here:
+  !       https://rosettacode.org/wiki/Sorting_algorithms/Quicksort#Fortran
+
+  ! DUMMY ARGUMENTS
+  type (FLOAT_SORT_GROUP_T), dimension(nrec), intent(in out) :: sort_group
+  integer (c_int), intent(in)                                :: nrec
+
+  ! LOCAL VARIABLES
+  integer (c_int)                  :: left, right
+  real (c_float)                   :: random
+  real (c_float)                   :: pivot
+  type (FLOAT_SORT_GROUP_T)        :: temp
+  integer (c_int)                  :: marker
+
+      if (nrec > 1) then
+
+          call random_number(random)
+          pivot = sort_group(int(random*real(nrec-1))+1)%float_value   ! random pivor (not best performance, but avoids worst-case)
+          left = 0
+          right = nrec + 1
+
+          do while (left < right)
+              right = right - 1
+              do while (sort_group(right)%float_value > pivot)
+                  right = right - 1
+              end do
+              left = left + 1
+              do while (sort_group(left)%float_value < pivot)
+                  left = left + 1
+              end do
+              if (left < right) then
+                  temp = sort_group(left)
+                  sort_group(left) = sort_group(right)
+                  sort_group(right) = temp
+              end if
+          end do
+
+          if (left == right) then
+              marker = left + 1
+          else
+              marker = left
+          end if
+
+          call qsort_float(sort_group(:marker-1),marker-1)
+          call qsort_float(sort_group(marker:),nrec-marker+1)
+
+      end if
+
+  end subroutine qsort_float
 
 !--------------------------------------------------------------------------------------------------
 
@@ -490,6 +781,35 @@ end function retrieve_values_as_logical_fn
     endif
 
   end subroutine split_and_return_text_sub
+
+
+  function int_to_char_fn(value)    result(text)
+    integer (c_int), intent(in)     :: value
+    character (len=:), allocatable  :: text
+
+    integer (c_int)      :: status
+    character (len=32)   :: sbuf
+    write(sbuf, fmt=*, iostat=status)  value
+    if (status==0) then
+      text = trim( adjustl(sbuf) )
+    else
+      text = "<NA>"
+    endif
+  end function int_to_char_fn
+
+
+  function float_to_char_fn(value)    result(text)
+    real (c_float), intent(in)     :: value
+    character (len=:), allocatable  :: text
+    integer (c_int)      :: status
+    character (len=32)   :: sbuf
+    write(sbuf, fmt=*, iostat=status)  value
+    if (status==0) then
+      text = trim( adjustl(sbuf) )
+    else
+      text = "<NA>"
+    endif
+  end function float_to_char_fn
 
 
 end module fstrings
