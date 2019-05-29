@@ -65,8 +65,8 @@ module fstrings
 
   type FSTRINGS_T
 
-    character (len=:), allocatable        :: s
-    integer (c_int)                       :: str_count = 0
+    character (len=:), allocatable    :: s
+    integer (c_int)                   :: str_count = 0
 
   contains
 
@@ -76,10 +76,15 @@ module fstrings
     procedure   :: print_all_entries_sub
     generic     :: print_all => print_all_entries_sub
 
+    procedure   :: print_as_markdown_sub
+    generic     :: print => print_as_markdown_sub
+
     procedure   :: append_character_to_fstring_sub
     procedure   :: append_character_array_to_fstring_sub
-    generic     :: append => append_character_to_fstring_sub,                   &
-                             append_character_array_to_fstring_sub
+    procedure   :: append_fstring_to_fstring_sub
+    generic     :: append => append_character_to_fstring_sub,                  &
+                             append_character_array_to_fstring_sub,            &
+                             append_fstring_to_fstring_sub
 
     procedure   :: count_strings_in_list_fn
     generic     :: count => count_strings_in_list_fn
@@ -294,6 +299,23 @@ subroutine append_character_array_to_fstring_sub(this, character_str)
   enddo
 
 end subroutine append_character_array_to_fstring_sub
+
+!--------------------------------------------------------------------------------------------------
+
+subroutine append_fstring_to_fstring_sub(this, other_fstring)
+
+  class (FSTRINGS_T), intent(inout), target        :: this
+  type (FSTRINGS_T), intent(inout)                 :: other_fstring
+
+  integer (c_int) :: i
+
+  do i=1, other_fstring%str_count
+
+    call this%append( other_fstring%get(i) )
+
+  enddo
+
+end subroutine append_fstring_to_fstring_sub
 
 !--------------------------------------------------------------------------------------------------
 
@@ -1033,5 +1055,35 @@ end function retrieve_values_as_logical_fn
     if ( new_fstring%str_count == 0 )  new_fstring = "<NA>"
 
   end function return_list_of_unique_values_fn
+
+!--------------------------------------------------------------------------------------------------
+
+  subroutine print_as_markdown_sub(this, lu)
+
+    use iso_fortran_env, only : OUTPUT_UNIT
+
+    class (FSTRINGS_T), intent(inout)     :: this
+    integer (c_int), optional             :: lu
+
+    ! [ LOCALS ]
+    integer (c_int)   :: lu_
+    integer (c_int)   :: i
+
+    if (present(lu) ) then
+      lu_ = lu
+    else
+      lu_ = OUTPUT_UNIT
+    endif
+
+    write(lu_, fmt="('|',a,t21,'|',a,t72,'|')") "Index","Value"
+    write(lu_, fmt="('|',a,t21,'|',a,t72,'|')") repeat("-",18)//":", repeat("-",49)//":"
+
+    do i=1, this%str_count
+
+      write(lu_, fmt="('|',i10,t21,'|',a,t72,'|')") i, this%get(i)
+
+    enddo
+
+  end subroutine print_as_markdown_sub
 
 end module fstrings
