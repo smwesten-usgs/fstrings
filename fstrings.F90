@@ -7,6 +7,11 @@ module fstrings
 
   public :: FSTRINGS_T
 
+  ! public :: operator(+)
+  ! interface operator(+)
+  !   module procedure   :: concatenate_fstring_to_fstring_sub
+  ! end interface operator(+)
+  !
   public :: assignment(=)
   interface assignment(=)
     module procedure   :: assign_fstring_to_character_sub
@@ -37,6 +42,26 @@ module fstrings
   interface split
     module procedure :: split_character_into_fstring_list_fn
   end interface split
+
+  private :: operator( .contains. )
+  interface operator( .contains. )
+    procedure :: is_substring_present_in_string_case_sensitive_fn
+  end interface operator( .contains. )
+
+  private :: operator( .containssimilar. )
+  interface operator( .containssimilar. )
+    procedure :: is_substring_present_in_string_case_insensitive_fn
+  end interface operator( .containssimilar. )
+
+  private :: upper
+  interface upper
+    procedure :: char_to_uppercase_fn
+  end interface upper
+
+  private :: lower
+  interface lower
+    procedure :: char_to_lowercase_fn
+  end interface lower
 
   type FSTRINGS_T
 
@@ -86,6 +111,19 @@ module fstrings
     procedure   :: clear_list_sub
     generic     :: clear => clear_list_sub
 
+    procedure   :: return_count_of_matching_strings_fn
+    generic     :: count_matching => return_count_of_matching_strings_fn
+
+!    procedure   :: is_substring_present_in_string_case_sensitive_fn
+!    procedure   :: is_substring_present_in_string_case_insensitive_fn
+
+
+    procedure   :: return_subset_of_partial_matches_fn
+    generic     :: grep => return_subset_of_partial_matches_fn
+
+    procedure   :: return_list_of_unique_values_fn
+    generic     :: unique => return_list_of_unique_values_fn
+
   end type FSTRINGS_T
 
   integer (c_int), parameter  :: NA_INT    = - (huge(1_c_int)-1_c_int)
@@ -116,11 +154,14 @@ contains
 
     integer (c_int)   :: indx
 
-    do indx=1,len(c_character_str)
-      if (c_character_str(indx:indx) == c_null_char)  exit
-    enddo
+    f_character_str = c_character_str
 
-    f_character_str = c_character_str(1:indx-1)
+    do indx=1,len(c_character_str)
+      if (c_character_str(indx:indx) == c_null_char) then
+        f_character_str = c_character_str(1:indx-1)
+        exit
+      endif
+    enddo
 
   end function c_to_f_string_fn
 
@@ -131,7 +172,21 @@ contains
     character (len=*), intent(in)                    :: f_character_str
     character (len=:), allocatable                   :: c_character_str
 
-    c_character_str = trim(f_character_str)//c_null_char
+    integer (c_int) :: str_len
+
+    str_len = len_trim(f_character_str)
+
+    if ( f_character_str(str_len:str_len) /= c_null_char ) then
+      ! last char is not null character; append c_null_char
+
+      c_character_str = trim(f_character_str)//c_null_char
+
+    else
+      ! already has a null character at end; do not append another
+
+      c_character_str = trim(f_character_str)
+
+    endif
 
   end function f_to_c_string_fn
 
@@ -144,7 +199,7 @@ contains
 
     call this%clear()
 
-    this%s = c_to_f_str(trim(character_str))//c_null_char
+    this%s = f_to_c_str(character_str)
     this%str_count = 1
 
   end subroutine assign_character_to_fstring_sub
@@ -217,7 +272,7 @@ contains
     character (len=*), intent(in)                    :: character_str
 
     if ( .not. allocated( this%s ) )  this%s = ""
-    this%s = trim(this%s)//trim(adjustl(c_to_f_str(character_str)))//c_null_char
+    this%s = trim(this%s)//trim(adjustl(f_to_c_str(character_str)))
     this%str_count = this%str_count + 1
 
   end subroutine append_character_to_fstring_sub
@@ -811,5 +866,172 @@ end function retrieve_values_as_logical_fn
     endif
   end function float_to_char_fn
 
+
+
+
+  !--------------------------------------------------------------------------------------------------
+
+  function char_to_uppercase_fn ( str )               result(text)
+    ! ARGUMENTS
+    character (len=*), intent(in)   :: str
+    character(len=len(str))         :: text
+    ! LOCALS
+    integer (c_int) :: i    ! do loop index
+    ! CONSTANTS
+    integer (c_int), parameter :: LOWER_TO_UPPER = -32
+    integer (c_int), parameter :: ASCII_SMALL_A = ichar("a")
+    integer (c_int), parameter :: ASCII_SMALL_Z = ichar("z")
+
+    text = str
+
+    do i=1,len_trim(text)
+      if ( ichar(text(i:i) ) >= ASCII_SMALL_A .and. ichar(text(i:i)) <= ASCII_SMALL_Z ) then
+        text(i:i) = char( ichar( text(i:i) ) + LOWER_TO_UPPER )
+      end if
+    end do
+
+  end function char_to_uppercase_fn
+
+!--------------------------------------------------------------------------
+
+  function char_to_lowercase_fn ( str )                  result(text)
+    ! ARGUMENTS
+    character (len=*), intent(in) :: str
+    character(len=len(str)) :: text
+    ! LOCALS
+    integer (c_int) :: i    ! do loop index
+    ! CONSTANTS
+    integer (c_int), parameter :: UPPER_TO_LOWER = 32
+    integer (c_int), parameter :: ASCII_A = ichar("A")
+    integer (c_int), parameter :: ASCII_Z = ichar("Z")
+
+    text = str
+
+    do i=1,len_trim(text)
+      if ( ichar(text(i:i) ) >= ASCII_A .and. ichar(text(i:i)) <= ASCII_Z ) then
+        text(i:i) = char( ichar( text(i:i) ) + UPPER_TO_LOWER )
+      end if
+    end do
+
+  end function char_to_lowercase_fn
+
+  !--------------------------------------------------------------------------------------------------
+
+  function is_substring_present_in_string_case_insensitive_fn(str, substr)   result(is_present)
+
+    character (len=*), intent(in)      :: str
+    character (len=*), intent(in)      :: substr
+    logical (c_bool)                   :: is_present
+
+    ! [ LOCALS ]
+    character (len=len_trim(str))  :: temp_str
+    character (len=len_trim(substr))  :: temp_substr
+
+    is_present = .FALSE._c_bool
+
+    temp_str = upper(str)
+    temp_substr = upper(substr)
+
+    if ( index(temp_str, temp_substr) /= 0 ) is_present = .TRUE._c_bool
+
+  end function is_substring_present_in_string_case_insensitive_fn
+
+!--------------------------------------------------------------------------------------------------
+
+  function is_substring_present_in_string_case_sensitive_fn(str, substr)   result(is_present)
+
+    character (len=*), intent(in)      :: str
+    character (len=*), intent(in)      :: substr
+    logical (c_bool)                   :: is_present
+
+    is_present = .FALSE._c_bool
+
+    if ( index(str, substr) /= 0 ) is_present = .TRUE._c_bool
+
+  end function is_substring_present_in_string_case_sensitive_fn
+
+!--------------------------------------------------------------------------------------------------
+
+  function return_count_of_matching_strings_fn(this, substr, match_case)    result(count)
+
+    class (FSTRINGS_T), intent(inout)       :: this
+    character (len=*), intent(in)           :: substr
+    logical (c_bool), intent(in), optional  :: match_case
+    integer (c_int)                         :: count
+
+    ! [ LOCALS ]
+    integer (c_int)  :: i
+    integer (c_int)  :: status
+    logical (c_bool) :: match_case_
+
+    if ( present( match_case ) ) then
+      match_case_ = match_case
+    else
+      match_case_ = .FALSE._c_bool
+    endif
+
+    count = 0
+
+    if ( match_case_ ) then
+
+      do i=1, this%str_count
+
+        if ( this%get(i) .contains. substr )  count = count + 1
+
+      enddo
+
+    else
+
+      do i=1, this%str_count
+
+        if ( this%get(i) .containssimilar. substr )  count = count + 1
+
+      enddo
+
+    endif
+
+  end function return_count_of_matching_strings_fn
+
+!--------------------------------------------------------------------------------------------------
+
+  function return_subset_of_partial_matches_fn( this, substr )     result(new_fstring)
+
+    class (FSTRINGS_T), intent(inout)                  :: this
+    character (len=*), intent(in)                      :: substr
+    type (FSTRINGS_T)                                  :: new_fstring
+
+    ! [ LOCALS ]
+    integer (c_int)                 :: i
+    character (len=:), allocatable  :: temp_str
+
+    do i=1, this%str_count
+      temp_str = this%get(i)
+      if ( temp_str .containssimilar. substr )   call new_fstring%append(temp_str)
+    enddo
+
+    if ( new_fstring%str_count == 0 )  new_fstring = "<NA>"
+
+  end function return_subset_of_partial_matches_fn
+
+!--------------------------------------------------------------------------------------------------
+
+  function return_list_of_unique_values_fn(this)    result(new_fstring)
+
+    class (FSTRINGS_T), intent(inout)   :: this
+    type (FSTRINGS_T)                   :: new_fstring
+
+    integer (c_int)                :: i
+    character (len=:), allocatable :: temp_str
+
+    do i=1, this%str_count
+
+      temp_str = this%get(i)
+      if ( new_fstring%count_matching( temp_str ) == 0 )  call new_fstring%append(temp_str)
+
+    enddo
+
+    if ( new_fstring%str_count == 0 )  new_fstring = "<NA>"
+
+  end function return_list_of_unique_values_fn
 
 end module fstrings
