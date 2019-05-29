@@ -1,4 +1,4 @@
-module test_01_fstrings
+module test__fstrings__count_entries
 
   use fruit
   use fstrings
@@ -26,4 +26,4 @@ contains
 
   end subroutine test_count_function
 
-end module test_01_fstrings
+end module test__fstrings__count_entries

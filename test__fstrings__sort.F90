@@ -1,4 +1,4 @@
-module test_02_fstrings
+module test__fstrings__sort
 
   use fruit
   use fstrings
@@ -59,4 +59,4 @@ contains
 
   end subroutine test_sort_routine
 
-end module test_02_fstrings
+end module test__fstrings__sort

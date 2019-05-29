@@ -1,4 +1,4 @@
-module test_04_fstrings
+module test__fstrings__grep
 
   use fruit
   use fstrings
@@ -8,7 +8,7 @@ module test_04_fstrings
 contains
 
   subroutine test_grep_function
-    ! create FSTRINGS_T objects from delimited character strings
+    ! create FSTRINGS_T 'grep' functionality
     type (FSTRINGS_T)              :: mylist
     TYPE (FSTRINGS_T)              :: mysubset
     character (len=:), allocatable :: mystring
@@ -22,4 +22,4 @@ contains
 
   end subroutine test_grep_function
 
-end module test_04_fstrings
+end module test__fstrings__grep
