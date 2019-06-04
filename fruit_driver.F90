@@ -2,6 +2,7 @@ program tests
 
   ! Driver program for FRUIT unit tests in:
   ! test__fstrings__append_list.F90
+  ! test__fstrings__chomp.F90
   ! test__fstrings__contains.F90
   ! test__fstrings__count_entries.F90
   ! test__fstrings__grep.F90
@@ -13,6 +14,7 @@ program tests
 
   use fruit
   use test__fstrings__append_list
+  use test__fstrings__chomp
   use test__fstrings__count_matching
   use test__fstrings__count_entries
   use test__fstrings__grep
@@ -28,6 +30,9 @@ program tests
   call run_test_case(test_append_list_function,"append one FSTRINGS_T object to another FSTRINGS_T object")
   call run_test_case(test_append_list_missing_values,"create FSTRINGS_T objects appended w missing values")
 
+  ! test__fstrings__chomp.F90:
+  call run_test_case(test_chomp,"test 'chomp' subroutine")
+
   ! test__fstrings__contains.F90:
   call run_test_case(test_count_matching_function,"create FSTRINGS_T objects from delimited character strings")
 
@@ -42,6 +47,7 @@ program tests
 
   ! test__fstrings__split_generate_list.F90:
   call run_test_case(test_split_function_to_generate_list_from_string,"create FSTRINGS_T objects from delimited character strings")
+  call run_test_case(test_append_list_string_missing_values,"create FSTRINGS_T objects from appended values incl missing values")
   call run_test_case(test_generate_list_string_missing_values,"create FSTRINGS_T objects from list w missing values")
 
   ! test__fstrings__unique.F90:

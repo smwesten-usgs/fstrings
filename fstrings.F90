@@ -181,16 +181,14 @@ contains
 
     str_len = len_trim(f_character_str)
 
-    if ( f_character_str(str_len:str_len) /= c_null_char ) then
-      ! last char is not null character; append c_null_char
-
-      c_character_str = trim(f_character_str)//c_null_char
-
-    else
+    if ( str_len == 0 ) then
+      c_character_str = c_null_char
+    elseif ( f_character_str(str_len:str_len) == c_null_char ) then
       ! already has a null character at end; do not append another
-
       c_character_str = trim(f_character_str)
-
+    else
+      ! last char is not null character; append c_null_char
+      c_character_str = trim(f_character_str)//c_null_char
     endif
 
   end function f_to_c_string_fn
@@ -231,6 +229,8 @@ contains
     character (len=len(character_str))  :: string
     character (len=len(character_str))  :: substring
     character (len=1)                   :: delimiter_chr_
+    integer (c_int)                     :: num_delimiters
+    integer (c_int)                     :: i
 
     if ( present(delimiter_chr) ) then
       delimiter_chr_ = delimiter_chr
@@ -239,16 +239,28 @@ contains
     endif
 
     string = character_str
+    num_delimiters = 0
 
-    do
+    do i=1, len_trim(string)
+      if ( string(i:i) == delimiter_chr_ ) num_delimiters = num_delimiters + 1
+    enddo
+
+    if ( num_delimiters == 0 ) then
+
+    else
+
+! example: "one, two, three, four"
+!           num_delimiters=3
+
+      do i=1, num_delimiters
+        call chomp(string, substring, delimiter_chr_)
+        call new_fstring%append( substring )
+      end do
 
       call chomp(string, substring, delimiter_chr_)
-
-      if ( len_trim(substring) == 0 ) exit
-
       call new_fstring%append( substring )
 
-    end do
+    endif
 
   end function split_character_into_fstring_list_fn
 
@@ -293,7 +305,7 @@ subroutine append_character_array_to_fstring_sub(this, character_str)
 
   do i=1, size(character_str,1)
 
-    this%s = trim(this%s)//trim(adjustl(c_to_f_str(character_str(i))))//c_null_char
+    this%s = trim(this%s)//trim(adjustl(f_to_c_str(character_str(i))))
     this%str_count = this%str_count + 1
 
   enddo
