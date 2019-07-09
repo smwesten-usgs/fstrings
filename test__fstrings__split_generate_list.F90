@@ -1,15 +1,15 @@
 module test__fstrings__split_generate_list
 
   use fruit
-  use fstrings
+  use fstring_list
   use iso_c_binding
   implicit none
 
 contains
 
-  subroutine test_split_function_to_generate_list_from_string
-    ! create FSTRINGS_T objects from delimited character strings
-    type (FSTRINGS_T)              :: mylist, another_list
+  subroutine test_generate_list_from_delimited_string
+    ! create FSTRING_LIST_T objects from delimited character strings
+    type (FSTRING_LIST_T)              :: mylist, another_list
     character (len=:), allocatable :: mystring
 
     mystring = "one, two, three, four"
@@ -20,11 +20,11 @@ contains
     call assert_equals ("three", mylist%get(3))
     call assert_equals ("eight", another_list%get(4))
 
-  end subroutine test_split_function_to_generate_list_from_string
+  end subroutine test_generate_list_from_delimited_string
 
   subroutine test_append_list_string_missing_values
-    ! create FSTRINGS_T objects from appended values incl missing values
-    type (FSTRINGS_T)              :: mylist
+    ! create FSTRING_LIST_T objects from appended list w missing values
+    type (FSTRING_LIST_T)              :: mylist
 
     call mylist%append("")
     call mylist%append("two")
@@ -37,8 +37,8 @@ contains
   end subroutine test_append_list_string_missing_values
 
   subroutine test_generate_list_string_missing_values
-    ! create FSTRINGS_T objects from list w missing values
-    type (FSTRINGS_T)              :: mylist, another_list
+    ! create FSTRING_LIST_T objects from split list w missing values
+    type (FSTRING_LIST_T)              :: mylist, another_list
     character (len=:), allocatable :: mystring
     mystring = "one, two, , four"
     mylist = split(mystring)

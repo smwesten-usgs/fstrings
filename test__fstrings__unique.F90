@@ -1,17 +1,17 @@
 module test__fstrings__unique
 
   use fruit
-  use fstrings
+  use fstring_list
   use iso_c_binding
   implicit none
 
 contains
 
   subroutine test_unique_function
-    ! create FSTRINGS_T objects from delimited character strings
-    type (FSTRINGS_T)              :: mylist
-    TYPE (FSTRINGS_T)              :: myuniquevals
-    character (len=:), allocatable :: mystring
+    ! pare a list with duplicates down to a unique list
+    type (FSTRING_LIST_T)              :: mylist
+    TYPE (FSTRING_LIST_T)              :: myuniquevals
+    character (len=:), allocatable     :: mystring
 
     ! count of unique values:
     !            1     2    3    4     5      6     7    8                9

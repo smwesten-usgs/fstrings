@@ -1,15 +1,15 @@
 module test__fstrings__count_entries
 
   use fruit
-  use fstrings
+  use fstring_list
   use iso_c_binding
   implicit none
 
 contains
 
   subroutine test_count_function
-    ! create FSTRINGS_T objects from delimited character strings
-    type (FSTRINGS_T)              :: mylist
+    ! create FSTRING_LIST_T objects from delimited character strings
+    type (FSTRING_LIST_T)              :: mylist
     character (len=:), allocatable :: mystring
 
     mystring = "one, two, three, four, five, six, seven"

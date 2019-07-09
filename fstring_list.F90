@@ -1,11 +1,12 @@
-module fstrings
+module fstring_list
 
   use iso_c_binding
+  use fstring
   implicit none
 
   private
 
-  public :: FSTRINGS_T
+  public :: FSTRING_LIST_T
 
   ! public :: operator(+)
   ! interface operator(+)
@@ -17,53 +18,7 @@ module fstrings
     module procedure   :: assign_fstring_to_character_sub
   end interface assignment(=)
 
-  private::f_to_c_str
-  interface f_to_c_str
-    module procedure :: f_to_c_string_fn
-  end interface f_to_c_str
-
-  private::c_to_f_str
-  interface c_to_f_str
-    module procedure :: c_to_f_string_fn
-  end interface c_to_f_str
-
-  private::as_character
-  interface as_character
-    module procedure :: int_to_char_fn
-    module procedure :: float_to_char_fn
-  end interface as_character
-
-  public::chomp
-  interface chomp
-    module procedure :: split_and_return_text_sub
-  end interface chomp
-
-  public::split
-  interface split
-    module procedure :: split_character_into_fstring_list_fn
-  end interface split
-
-  private :: operator( .contains. )
-  interface operator( .contains. )
-    procedure :: is_substring_present_in_string_case_sensitive_fn
-  end interface operator( .contains. )
-
-  private :: operator( .containssimilar. )
-  interface operator( .containssimilar. )
-    procedure :: is_substring_present_in_string_case_insensitive_fn
-  end interface operator( .containssimilar. )
-
-  private :: upper
-  interface upper
-    procedure :: char_to_uppercase_fn
-  end interface upper
-
-  private :: lower
-  interface lower
-    procedure :: char_to_lowercase_fn
-  end interface lower
-
-  type FSTRINGS_T
+  type FSTRING_LIST_T
 
     character (len=:), allocatable    :: s
     integer (c_int)                   :: str_count = 0
@@ -129,11 +84,17 @@ module fstrings
     procedure   :: return_list_of_unique_values_fn
     generic     :: unique => return_list_of_unique_values_fn
 
-  end type FSTRINGS_T
+  end type FSTRING_LIST_T
 
   integer (c_int), parameter  :: NA_INT    = - (huge(1_c_int)-1_c_int)
   real (c_float), parameter   :: NA_FLOAT  = - (huge(1._c_float)-1._c_float)
   real (c_double), parameter  :: NA_DOUBLE = - (huge(1._c_double)-1._c_double)
+
+  public::split
+  interface split
+    module procedure :: split_character_into_fstring_list_fn
+  end interface split
+
 
   type ALPHA_SORT_GROUP_T
     integer (c_int)                :: order
@@ -152,52 +113,11 @@ module fstrings
 
 contains
 
-  function c_to_f_string_fn(c_character_str)   result(f_character_str)
-
-    character (len=*), intent(in)                    :: c_character_str
-    character (len=:), allocatable                   :: f_character_str
-
-    integer (c_int)   :: indx
-
-    f_character_str = c_character_str
-
-    do indx=1,len(c_character_str)
-      if (c_character_str(indx:indx) == c_null_char) then
-        f_character_str = c_character_str(1:indx-1)
-        exit
-      endif
-    enddo
-
-  end function c_to_f_string_fn
-
-!--------------------------------------------------------------------------------------------------
-
-  function f_to_c_string_fn(f_character_str)   result(c_character_str)
-
-    character (len=*), intent(in)                    :: f_character_str
-    character (len=:), allocatable                   :: c_character_str
-
-    integer (c_int) :: str_len
-
-    str_len = len_trim(f_character_str)
-
-    if ( str_len == 0 ) then
-      c_character_str = c_null_char
-    elseif ( f_character_str(str_len:str_len) == c_null_char ) then
-      ! already has a null character at end; do not append another
-      c_character_str = trim(f_character_str)
-    else
-      ! last char is not null character; append c_null_char
-      c_character_str = trim(f_character_str)//c_null_char
-    endif
-
-  end function f_to_c_string_fn
-
 !--------------------------------------------------------------------------------------------------
 
   subroutine assign_character_to_fstring_sub(this, character_str)
 
-    class (FSTRINGS_T), intent(inout)                :: this
+    class (FSTRING_LIST_T), intent(inout)                :: this
     character (len=*), intent(in)                    :: character_str
 
     call this%clear()
@@ -212,7 +132,7 @@ contains
   subroutine assign_fstring_to_character_sub(character_str, this)
 
     character (len=:), allocatable, intent(out)      :: character_str
-    type (FSTRINGS_T), intent(inout)                 :: this
+    type (FSTRING_LIST_T), intent(inout)                 :: this
 
     character_str = this%get(1)
 
@@ -224,7 +144,7 @@ contains
 
     character (len=*), intent(in)                    :: character_str
     character (len=1), intent(in), optional          :: delimiter_chr
-    type (FSTRINGS_T)                                :: new_fstring
+    type (FSTRING_LIST_T)                                :: new_fstring
 
     character (len=len(character_str))  :: string
     character (len=len(character_str))  :: substring
@@ -268,7 +188,7 @@ contains
 
   function count_strings_in_list_fn(this)        result(str_count)
 
-    class (FSTRINGS_T), intent(inout), target        :: this
+    class (FSTRING_LIST_T), intent(inout), target        :: this
     integer (c_int)                                  :: str_count
 
     integer (c_int) :: i
@@ -285,7 +205,7 @@ contains
 
   subroutine append_character_to_fstring_sub(this, character_str)
 
-    class (FSTRINGS_T), intent(inout), target        :: this
+    class (FSTRING_LIST_T), intent(inout), target        :: this
     character (len=*), intent(in)                    :: character_str
 
     if ( .not. allocated( this%s ) )  this%s = ""
@@ -298,7 +218,7 @@ contains
 
 subroutine append_character_array_to_fstring_sub(this, character_str)
 
-  class (FSTRINGS_T), intent(inout), target        :: this
+  class (FSTRING_LIST_T), intent(inout), target        :: this
   character (len=*), intent(in)                    :: character_str(:)
 
   integer (c_int) :: i
@@ -316,8 +236,8 @@ end subroutine append_character_array_to_fstring_sub
 
 subroutine append_fstring_to_fstring_sub(this, other_fstring)
 
-  class (FSTRINGS_T), intent(inout), target        :: this
-  type (FSTRINGS_T), intent(inout)                 :: other_fstring
+  class (FSTRING_LIST_T), intent(inout), target        :: this
+  type (FSTRING_LIST_T), intent(inout)                 :: other_fstring
 
   integer (c_int) :: i
 
@@ -333,7 +253,7 @@ end subroutine append_fstring_to_fstring_sub
 
   subroutine print_all_entries_sub(this)
 
-    class (FSTRINGS_T), intent(inout), target   :: this
+    class (FSTRING_LIST_T), intent(inout), target   :: this
 
     character (len=:), allocatable :: sbuf
     integer (c_int)                :: start_pos
@@ -360,7 +280,7 @@ end subroutine append_fstring_to_fstring_sub
 
   subroutine list_finalize_sub(this)
 
-    type (FSTRINGS_T), intent(inout)          :: this
+    type (FSTRING_LIST_T), intent(inout)          :: this
 
     call this%clear()
 
@@ -370,7 +290,7 @@ end subroutine append_fstring_to_fstring_sub
 
   subroutine clear_list_sub(this)
 
-    class (FSTRINGS_T), intent(inout)        :: this
+    class (FSTRING_LIST_T), intent(inout)        :: this
 
     this%s = ""
     this%str_count = 0
@@ -381,7 +301,7 @@ end subroutine append_fstring_to_fstring_sub
 
   function retrieve_values_as_integer_fn(this)   result(values)
 
-    class (FSTRINGS_T), intent(inout)         :: this
+    class (FSTRING_LIST_T), intent(inout)         :: this
     integer (c_int), allocatable              :: values(:)
 
     integer (c_int)    :: i
@@ -407,7 +327,7 @@ end subroutine append_fstring_to_fstring_sub
 
   function retrieve_values_as_float_fn(this)   result(values)
 
-    class (FSTRINGS_T), intent(inout)         :: this
+    class (FSTRING_LIST_T), intent(inout)         :: this
     real (c_float), allocatable               :: values(:)
 
     integer (c_int)    :: i
@@ -433,7 +353,7 @@ end subroutine append_fstring_to_fstring_sub
 
 function retrieve_values_as_double_fn(this)   result(values)
 
-  class (FSTRINGS_T), intent(inout)         :: this
+  class (FSTRING_LIST_T), intent(inout)         :: this
   real (c_double), allocatable              :: values(:)
 
   integer (c_int)    :: i
@@ -459,7 +379,7 @@ end function retrieve_values_as_double_fn
 
 function retrieve_values_as_logical_fn(this)   result(values)
 
-  class (FSTRINGS_T), intent(inout)         :: this
+  class (FSTRING_LIST_T), intent(inout)         :: this
   logical (c_bool), allocatable             :: values(:)
 
   integer (c_int)    :: i
@@ -489,7 +409,7 @@ end function retrieve_values_as_logical_fn
 
   function retrieve_value_from_list_at_index_fn(this, index_val)   result(text)
 
-    class (FSTRINGS_T), intent(inout)         :: this
+    class (FSTRING_LIST_T), intent(inout)         :: this
     integer (c_int), intent(in)               :: index_val
     character(len=:), allocatable             :: text
 
@@ -524,7 +444,7 @@ end function retrieve_values_as_logical_fn
 
   subroutine quicksort_alpha_sub(this, sort_order)
 
-    class (FSTRINGS_T), intent(inout)         :: this
+    class (FSTRING_LIST_T), intent(inout)         :: this
     character (len=*), intent(in), optional   :: sort_order
 
     type (ALPHA_SORT_GROUP_T), allocatable :: sort_group(:)
@@ -574,7 +494,7 @@ end function retrieve_values_as_logical_fn
 !-------------------------------------------------------------------------------------------------
 
   subroutine quicksort_int_sub(this, sort_order)
-    class (FSTRINGS_T), intent(inout)         :: this
+    class (FSTRING_LIST_T), intent(inout)         :: this
     character (len=*), intent(in), optional   :: sort_order
 
     type (INT_SORT_GROUP_T), allocatable   :: sort_group(:)
@@ -625,7 +545,7 @@ end function retrieve_values_as_logical_fn
 
   subroutine quicksort_float_sub(this, sort_order)
 
-    class (FSTRINGS_T), intent(inout)         :: this
+    class (FSTRING_LIST_T), intent(inout)         :: this
     character (len=*), intent(in), optional   :: sort_order
 
     type (FLOAT_SORT_GROUP_T), allocatable :: sort_group(:)
@@ -839,157 +759,11 @@ end function retrieve_values_as_logical_fn
 
 !--------------------------------------------------------------------------------------------------
 
-  subroutine split_and_return_text_sub(str, substr, delimiter_chr)
-
-    character (len=*), intent(inout)                     :: str
-    character (len=*), intent(out)                       :: substr
-    character (len=*), intent(in), optional              :: delimiter_chr
-
-    ! [ LOCALS ]
-    character (len=:), allocatable :: delimiter_chr_
-    integer (kind=c_int) :: iIndex
-
-    if ( present(delimiter_chr) ) then
-      delimiter_chr_ = delimiter_chr
-    else
-      delimiter_chr_ = ","
-    endif
-
-    str = adjustl(str)
-
-    iIndex = scan( string = str, set = delimiter_chr_ )
-
-    if (iIndex == 0) then
-      ! no delimiters found; return string as was supplied originally
-      substr = str
-      str = ""
-    else
-      ! delimiters were found; split and return the chunks of text
-      substr = trim( str(1:iIndex-1) )
-      str = trim( adjustl( str(iIndex + 1:) ) )
-    endif
-
-  end subroutine split_and_return_text_sub
-
-
-  function int_to_char_fn(value)    result(text)
-    integer (c_int), intent(in)     :: value
-    character (len=:), allocatable  :: text
-
-    integer (c_int)      :: status
-    character (len=32)   :: sbuf
-    write(sbuf, fmt=*, iostat=status)  value
-    if (status==0) then
-      text = trim( adjustl(sbuf) )
-    else
-      text = "<NA>"
-    endif
-  end function int_to_char_fn
-
-
-  function float_to_char_fn(value)    result(text)
-    real (c_float), intent(in)     :: value
-    character (len=:), allocatable  :: text
-    integer (c_int)      :: status
-    character (len=32)   :: sbuf
-    write(sbuf, fmt=*, iostat=status)  value
-    if (status==0) then
-      text = trim( adjustl(sbuf) )
-    else
-      text = "<NA>"
-    endif
-  end function float_to_char_fn
-
-
-
-
-  !--------------------------------------------------------------------------------------------------
-
-  function char_to_uppercase_fn ( str )               result(text)
-    ! ARGUMENTS
-    character (len=*), intent(in)   :: str
-    character(len=len(str))         :: text
-    ! LOCALS
-    integer (c_int) :: i    ! do loop index
-    ! CONSTANTS
-    integer (c_int), parameter :: LOWER_TO_UPPER = -32
-    integer (c_int), parameter :: ASCII_SMALL_A = ichar("a")
-    integer (c_int), parameter :: ASCII_SMALL_Z = ichar("z")
-
-    text = str
-
-    do i=1,len_trim(text)
-      if ( ichar(text(i:i) ) >= ASCII_SMALL_A .and. ichar(text(i:i)) <= ASCII_SMALL_Z ) then
-        text(i:i) = char( ichar( text(i:i) ) + LOWER_TO_UPPER )
-      end if
-    end do
-
-  end function char_to_uppercase_fn
-
-!--------------------------------------------------------------------------
-
-  function char_to_lowercase_fn ( str )                  result(text)
-    ! ARGUMENTS
-    character (len=*), intent(in) :: str
-    character(len=len(str)) :: text
-    ! LOCALS
-    integer (c_int) :: i    ! do loop index
-    ! CONSTANTS
-    integer (c_int), parameter :: UPPER_TO_LOWER = 32
-    integer (c_int), parameter :: ASCII_A = ichar("A")
-    integer (c_int), parameter :: ASCII_Z = ichar("Z")
-
-    text = str
-
-    do i=1,len_trim(text)
-      if ( ichar(text(i:i) ) >= ASCII_A .and. ichar(text(i:i)) <= ASCII_Z ) then
-        text(i:i) = char( ichar( text(i:i) ) + UPPER_TO_LOWER )
-      end if
-    end do
-
-  end function char_to_lowercase_fn
-
-  !--------------------------------------------------------------------------------------------------
-
-  function is_substring_present_in_string_case_insensitive_fn(str, substr)   result(is_present)
-
-    character (len=*), intent(in)      :: str
-    character (len=*), intent(in)      :: substr
-    logical (c_bool)                   :: is_present
-
-    ! [ LOCALS ]
-    character (len=len_trim(str))  :: temp_str
-    character (len=len_trim(substr))  :: temp_substr
-
-    is_present = .FALSE._c_bool
-
-    temp_str = upper(str)
-    temp_substr = upper(substr)
-
-    if ( index(temp_str, temp_substr) /= 0 ) is_present = .TRUE._c_bool
-
-  end function is_substring_present_in_string_case_insensitive_fn
-
-!--------------------------------------------------------------------------------------------------
-
-  function is_substring_present_in_string_case_sensitive_fn(str, substr)   result(is_present)
-
-    character (len=*), intent(in)      :: str
-    character (len=*), intent(in)      :: substr
-    logical (c_bool)                   :: is_present
-
-    is_present = .FALSE._c_bool
-
-    if ( index(str, substr) /= 0 ) is_present = .TRUE._c_bool
-
-  end function is_substring_present_in_string_case_sensitive_fn
-
-!--------------------------------------------------------------------------------------------------
-
   function return_count_of_matching_strings_fn(this, substr, match_case)    result(count)
 
-    class (FSTRINGS_T), intent(inout)       :: this
-    character (len=*), intent(in)           :: substr
+    class (FSTRING_LIST_T), intent(inout)       :: this
+    character (len=*), intent(in)               :: substr
+
     logical (c_bool), intent(in), optional  :: match_case
     integer (c_int)                         :: count
 
@@ -1030,9 +804,9 @@ end function retrieve_values_as_logical_fn
 
   function return_subset_of_partial_matches_fn( this, substr )     result(new_fstring)
 
-    class (FSTRINGS_T), intent(inout)                  :: this
+    class (FSTRING_LIST_T), intent(inout)                  :: this
     character (len=*), intent(in)                      :: substr
-    type (FSTRINGS_T)                                  :: new_fstring
+    type (FSTRING_LIST_T)                                  :: new_fstring
 
     ! [ LOCALS ]
     integer (c_int)                 :: i
@@ -1051,8 +825,8 @@ end function retrieve_values_as_logical_fn
 
   function return_list_of_unique_values_fn(this)    result(new_fstring)
 
-    class (FSTRINGS_T), intent(inout)   :: this
-    type (FSTRINGS_T)                   :: new_fstring
+    class (FSTRING_LIST_T), intent(inout)   :: this
+    type (FSTRING_LIST_T)                   :: new_fstring
 
     integer (c_int)                :: i
     character (len=:), allocatable :: temp_str
@@ -1074,7 +848,7 @@ end function retrieve_values_as_logical_fn
 
     use iso_fortran_env, only : OUTPUT_UNIT
 
-    class (FSTRINGS_T), intent(inout)     :: this
+    class (FSTRING_LIST_T), intent(inout)     :: this
     integer (c_int), optional             :: lu
 
     ! [ LOCALS ]
@@ -1098,4 +872,4 @@ end function retrieve_values_as_logical_fn
 
   end subroutine print_as_markdown_sub
 
-end module fstrings
+end module fstring_list

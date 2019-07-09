@@ -1,18 +1,19 @@
 module test__fstrings__sort
 
   use fruit
-  use fstrings
+  use fstring
+  use fstring_list
   use iso_c_binding
   implicit none
 
 contains
 
   subroutine test_sort_routine
-    ! sort FSTRINGS_T objects and extract correct values
+    ! sort FSTRING_LIST_T objects and extract correct values
 
-    type (FSTRINGS_T)    :: name
-    type (FSTRINGS_T)    :: gender
-    type (FSTRINGS_T)    :: number
+    type (FSTRING_LIST_T)    :: name
+    type (FSTRING_LIST_T)    :: gender
+    type (FSTRING_LIST_T)    :: number
     character (len=256)  :: sbuf
     character (len=256)  :: substr
     character (len=256)  :: open_iomsg

@@ -1,16 +1,16 @@
 module test__fstrings__grep
 
   use fruit
-  use fstrings
+  use fstring_list
   use iso_c_binding
   implicit none
 
 contains
 
   subroutine test_grep_function
-    ! create FSTRINGS_T 'grep' functionality
-    type (FSTRINGS_T)              :: mylist
-    TYPE (FSTRINGS_T)              :: mysubset
+    ! create FSTRING_LIST_T 'grep' functionality
+    type (FSTRING_LIST_T)              :: mylist
+    TYPE (FSTRING_LIST_T)              :: mysubset
     character (len=:), allocatable :: mystring
 
     mystring = "one, two, three, four, five, six, seven"

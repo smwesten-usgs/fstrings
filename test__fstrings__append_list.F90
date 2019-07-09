@@ -1,15 +1,15 @@
 module test__fstrings__append_list
 
   use fruit
-  use fstrings
+  use fstring_list
   use iso_c_binding
   implicit none
 
 contains
 
   subroutine test_append_list_function
-    ! append one FSTRINGS_T object to another FSTRINGS_T object
-    type (FSTRINGS_T)              :: mylist, mylist2
+    ! append one FSTRING_LIST_T object to another FSTRING_LIST_T object
+    type (FSTRING_LIST_T)              :: mylist, mylist2
     character (len=:), allocatable :: mystring, mystring2
 
     mystring = "one, two, three, four, five, six, seven"
@@ -30,8 +30,8 @@ contains
   end subroutine test_append_list_function
 
   subroutine test_append_list_missing_values
-    ! create FSTRINGS_T objects appended w missing values
-    type (FSTRINGS_T)              :: mylist
+    ! create FSTRING_LIST_T objects appended w missing values
+    type (FSTRING_LIST_T)              :: mylist
 
     call mylist%append("one")
     call mylist%append("two")
