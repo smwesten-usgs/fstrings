@@ -21,7 +21,8 @@ module fstring_list
   type FSTRING_LIST_T
 
     character (len=:), allocatable    :: s
-    integer (c_int)                   :: str_count = 0
+    integer (c_int)                   :: count = 0
+    integer (c_int)                   :: missing_value_count = 0
 
   contains
 
@@ -42,7 +43,7 @@ module fstring_list
                              append_fstring_to_fstring_sub
 
     procedure   :: count_strings_in_list_fn
-    generic     :: count => count_strings_in_list_fn
+    generic     :: count_entries => count_strings_in_list_fn
 
     procedure   :: retrieve_value_from_list_at_index_fn
     generic     :: get => retrieve_value_from_list_at_index_fn
@@ -58,6 +59,9 @@ module fstring_list
 
     procedure   :: retrieve_values_as_logical_fn
     generic     :: get_logical => retrieve_values_as_logical_fn
+
+    procedure   :: are_there_missing_list_values_fn
+    generic     :: empty_entries_present => are_there_missing_list_values_fn
 
     procedure   :: quicksort_alpha_sub
     generic     :: sort => quicksort_alpha_sub
@@ -95,6 +99,10 @@ module fstring_list
     module procedure :: split_character_into_fstring_list_fn
   end interface split
 
+  public::create_list
+  interface create_list
+    module procedure :: split_character_into_fstring_list_fn
+  end interface create_list
 
   type ALPHA_SORT_GROUP_T
     integer (c_int)                :: order
@@ -123,7 +131,7 @@ contains
     call this%clear()
 
     this%s = f_to_c_str(character_str)
-    this%str_count = 1
+    this%count = 1
 
   end subroutine assign_character_to_fstring_sub
 
@@ -186,17 +194,17 @@ contains
 
 !--------------------------------------------------------------------------------------------------
 
-  function count_strings_in_list_fn(this)        result(str_count)
+  function count_strings_in_list_fn(this)        result(count)
 
     class (FSTRING_LIST_T), intent(inout), target        :: this
-    integer (c_int)                                  :: str_count
+    integer (c_int)                                      :: count
 
     integer (c_int) :: i
 
-    str_count = 0
+    count = 0
 
     do i=1, len_trim(this%s)
-      if( this%s(i:i) == c_null_char ) str_count = str_count + 1
+      if( this%s(i:i) == c_null_char ) count = count + 1
     enddo
 
   end function count_strings_in_list_fn
@@ -206,11 +214,13 @@ contains
   subroutine append_character_to_fstring_sub(this, character_str)
 
     class (FSTRING_LIST_T), intent(inout), target        :: this
-    character (len=*), intent(in)                    :: character_str
+    character (len=*), intent(in)                        :: character_str
 
     if ( .not. allocated( this%s ) )  this%s = ""
     this%s = trim(this%s)//trim(adjustl(f_to_c_str(character_str)))
-    this%str_count = this%str_count + 1
+    if ( len_trim(character_str) == 0 )                                        &
+       this%missing_value_count = this%missing_value_count + 1
+    this%count = this%count + 1
 
   end subroutine append_character_to_fstring_sub
 
@@ -226,7 +236,9 @@ subroutine append_character_array_to_fstring_sub(this, character_str)
   do i=1, size(character_str,1)
 
     this%s = trim(this%s)//trim(adjustl(f_to_c_str(character_str(i))))
-    this%str_count = this%str_count + 1
+    if ( len_trim(character_str(i)) == 0 )                                     &
+       this%missing_value_count = this%missing_value_count + 1
+    this%count = this%count + 1
 
   enddo
 
@@ -239,15 +251,34 @@ subroutine append_fstring_to_fstring_sub(this, other_fstring)
   class (FSTRING_LIST_T), intent(inout), target        :: this
   type (FSTRING_LIST_T), intent(inout)                 :: other_fstring
 
-  integer (c_int) :: i
+  integer (c_int)                 :: i
+  character (len=:), allocatable  :: temp_str
 
-  do i=1, other_fstring%str_count
+  do i=1, other_fstring%count
 
+    temp_str = other_fstring%get(i)
     call this%append( other_fstring%get(i) )
+    if ( len_trim(temp_str) == 0 )                                             &
+       this%missing_value_count = this%missing_value_count + 1
 
   enddo
 
 end subroutine append_fstring_to_fstring_sub
+
+!--------------------------------------------------------------------------------------------------
+
+  function are_there_missing_list_values_fn(this)    result(value)
+
+    class (FSTRING_LIST_T), intent(inout), target   :: this
+    logical (c_bool)                                :: value
+
+    if ( this%missing_value_count > 0 )  then
+      value = .true._c_bool
+    else
+      value = .false._c_bool
+    endif
+
+  end function are_there_missing_list_values_fn
 
 !--------------------------------------------------------------------------------------------------
 
@@ -265,7 +296,7 @@ end subroutine append_fstring_to_fstring_sub
     end_pos = index( this%s, c_null_char ) - 1
     str_len = len_trim( this%s )
 
-    do i=1, this%count()
+    do i=1, this%count_entries()
 
       write(*,fmt="(a)") this%s(start_pos:end_pos)
 
@@ -293,7 +324,7 @@ end subroutine append_fstring_to_fstring_sub
     class (FSTRING_LIST_T), intent(inout)        :: this
 
     this%s = ""
-    this%str_count = 0
+    this%count = 0
 
   end subroutine clear_list_sub
 
@@ -309,9 +340,9 @@ end subroutine append_fstring_to_fstring_sub
     integer (c_int)    :: op_status
     character (len=64) :: sbuf
 
-    allocate(values(this%str_count),stat=op_status)
+    allocate(values(this%count),stat=op_status)
 
-    do i=1,this%str_count
+    do i=1,this%count
       sbuf = this%get(i)
       read(unit=sbuf, fmt=*, iostat=op_status) value
       if ( op_status==0 ) then
@@ -335,9 +366,9 @@ end subroutine append_fstring_to_fstring_sub
     integer (c_int)    :: op_status
     character (len=64) :: sbuf
 
-    allocate(values(this%str_count),stat=op_status)
+    allocate(values(this%count),stat=op_status)
 
-    do i=1,this%str_count
+    do i=1,this%count
       sbuf = this%get(i)
       read(unit=sbuf, fmt=*, iostat=op_status) value
       if ( op_status==0 ) then
@@ -361,9 +392,9 @@ function retrieve_values_as_double_fn(this)   result(values)
   integer (c_int)    :: op_status
   character (len=64) :: sbuf
 
-  allocate(values(this%str_count),stat=op_status)
+  allocate(values(this%count),stat=op_status)
 
-  do i=1,this%str_count
+  do i=1,this%count
     sbuf = this%get(i)
     read(unit=sbuf, fmt=*, iostat=op_status) value
     if ( op_status==0 ) then
@@ -387,9 +418,9 @@ function retrieve_values_as_logical_fn(this)   result(values)
   integer (c_int)    :: op_status
   character (len=64) :: sbuf
 
-  allocate(values(this%str_count),stat=op_status)
+  allocate(values(this%count),stat=op_status)
 
-  do i=1,this%str_count
+  do i=1,this%count
     sbuf = this%get(i)
 
     select case(sbuf)
@@ -424,7 +455,7 @@ end function retrieve_values_as_logical_fn
 
     text = "<NA>"
 
-    do i=1, this%str_count
+    do i=1, this%count
 
       if ( index_val == i ) then
         text = this%s(start_pos:end_pos)
@@ -449,7 +480,7 @@ end function retrieve_values_as_logical_fn
 
     type (ALPHA_SORT_GROUP_T), allocatable :: sort_group(:)
     integer (c_int)                        :: i
-    integer (c_int)                        :: str_count
+    integer (c_int)                        :: count
     logical (c_bool)                       :: decreasing_order
 
     decreasing_order = .false._c_bool
@@ -462,29 +493,29 @@ end function retrieve_values_as_logical_fn
       end select
     endif
 
-    str_count = this%str_count
+    count = this%count
 
-    allocate(sort_group(str_count))
+    allocate(sort_group(count))
 
     ! create the 'sort_group' data structure
-    do i=1, str_count
+    do i=1, count
       sort_group(i)%order = i
       sort_group(i)%alpha_value = this%get(i)
     enddo
 
-    call qsort_alpha(sort_group, this%str_count)
+    call qsort_alpha(sort_group, this%count)
 
     ! wipe out previous values
     call this%clear()
 
     if ( decreasing_order ) then
       ! copy sorted values back into list structure (DECREASING ORDER)
-      do i=str_count, 1, -1
+      do i=count, 1, -1
         call this%append(sort_group(i)%alpha_value)
       enddo
     else
       ! copy sorted values back into list structure (INCREASING ORDER)
-      do i=1, str_count
+      do i=1, count
         call this%append(sort_group(i)%alpha_value)
       enddo
     endif
@@ -500,7 +531,7 @@ end function retrieve_values_as_logical_fn
     type (INT_SORT_GROUP_T), allocatable   :: sort_group(:)
     integer (c_int), allocatable           :: int_values(:)
     integer (c_int)                        :: i
-    integer (c_int)                        :: str_count
+    integer (c_int)                        :: count
     logical (c_bool)                       :: decreasing_order
 
     decreasing_order = .false._c_bool
@@ -512,30 +543,30 @@ end function retrieve_values_as_logical_fn
       end select
     endif
 
-    str_count = this%str_count
+    count = this%count
 
-    allocate(sort_group(str_count))
-    allocate(int_values(str_count))
+    allocate(sort_group(count))
+    allocate(int_values(count))
 
     int_values = this%get_integer()
 
     ! create the 'sort_group' data structure
-    do i=1, str_count
+    do i=1, count
       sort_group(i)%order = i
       sort_group(i)%int_value = int_values(i)
     enddo
 
-    call qsort_int(sort_group, this%str_count)
+    call qsort_int(sort_group, this%count)
     ! wipe out previous values
     call this%clear()
     if ( decreasing_order ) then
       ! copy sorted values back into list structure (DECREASING ORDER)
-      do i=str_count, 1, -1
+      do i=count, 1, -1
         call this%append( as_character(sort_group(i)%int_value) )
       enddo
     else
       ! copy sorted values back into list structure (INCREASING ORDER)
-      do i=1, str_count
+      do i=1, count
         call this%append( as_character(sort_group(i)%int_value) )
       enddo
     endif
@@ -551,7 +582,7 @@ end function retrieve_values_as_logical_fn
     type (FLOAT_SORT_GROUP_T), allocatable :: sort_group(:)
     real (c_float), allocatable            :: float_values(:)
     integer (c_int)                        :: i
-    integer (c_int)                        :: str_count
+    integer (c_int)                        :: count
     logical (c_bool)                       :: decreasing_order
 
     decreasing_order = .false._c_bool
@@ -564,31 +595,31 @@ end function retrieve_values_as_logical_fn
       end select
     endif
 
-    str_count = this%str_count
+    count = this%count
 
-    allocate(sort_group(str_count))
+    allocate(sort_group(count))
 
     float_values = this%get_float()
 
     ! create the 'sort_group' data structure
-    do i=1, str_count
+    do i=1, count
       sort_group(i)%order = i
       sort_group(i)%float_value = float_values(i)
     enddo
 
-    call qsort_float(sort_group, this%str_count)
+    call qsort_float(sort_group, this%count)
 
     ! wipe out previous values
     call this%clear()
 
     if ( decreasing_order ) then
       ! copy sorted values back into list structure (DECREASING ORDER)
-      do i=str_count, 1, -1
+      do i=count, 1, -1
         call this%append( as_character(sort_group(i)%float_value) )
       enddo
     else
       ! copy sorted values back into list structure (INCREASING ORDER)
-      do i=1, str_count
+      do i=1, count
         call this%append( as_character(sort_group(i)%float_value) )
       enddo
     endif
@@ -782,7 +813,7 @@ end function retrieve_values_as_logical_fn
 
     if ( match_case_ ) then
 
-      do i=1, this%str_count
+      do i=1, this%count
 
         if ( this%get(i) .contains. substr )  count = count + 1
 
@@ -790,7 +821,7 @@ end function retrieve_values_as_logical_fn
 
     else
 
-      do i=1, this%str_count
+      do i=1, this%count
 
         if ( this%get(i) .containssimilar. substr )  count = count + 1
 
@@ -812,12 +843,12 @@ end function retrieve_values_as_logical_fn
     integer (c_int)                 :: i
     character (len=:), allocatable  :: temp_str
 
-    do i=1, this%str_count
+    do i=1, this%count
       temp_str = this%get(i)
       if ( temp_str .containssimilar. substr )   call new_fstring%append(temp_str)
     enddo
 
-    if ( new_fstring%str_count == 0 )  new_fstring = "<NA>"
+    if ( new_fstring%count == 0 )  new_fstring = "<NA>"
 
   end function return_subset_of_partial_matches_fn
 
@@ -831,14 +862,14 @@ end function retrieve_values_as_logical_fn
     integer (c_int)                :: i
     character (len=:), allocatable :: temp_str
 
-    do i=1, this%str_count
+    do i=1, this%count
 
       temp_str = this%get(i)
       if ( new_fstring%count_matching( temp_str ) == 0 )  call new_fstring%append(temp_str)
 
     enddo
 
-    if ( new_fstring%str_count == 0 )  new_fstring = "<NA>"
+    if ( new_fstring%count == 0 )  new_fstring = "<NA>"
 
   end function return_list_of_unique_values_fn
 
@@ -864,7 +895,7 @@ end function retrieve_values_as_logical_fn
     write(lu_, fmt="('|',a,t21,'|',a,t72,'|')") "Index","Value"
     write(lu_, fmt="('|',a,t21,'|',a,t72,'|')") repeat("-",18)//":", repeat("-",49)//":"
 
-    do i=1, this%str_count
+    do i=1, this%count
 
       write(lu_, fmt="('|',i10,t21,'|',a,t72,'|')") i, this%get(i)
 

@@ -15,14 +15,14 @@ contains
     mystring = "one, two, three, four, five, six, seven"
     mylist = split(mystring)
 
-    call assert_equals(7, mylist%count() )
+    call assert_equals(7, mylist%count_entries() )
 
     call mylist%append("eight")
     call mylist%append("nine")
     call mylist%append("ten")
     call mylist%append("eleven")
 
-    call assert_equals(11,mylist%count())
+    call assert_equals(11,mylist%count_entries())
 
   end subroutine test_count_function
 

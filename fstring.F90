@@ -152,7 +152,7 @@ module fstring
 
   ! [ special ASCII characters ]
   public :: TAB, WHITESPACE, BACKSLASH, FORWARDSLASH, CARRIAGE_RETURN, COMMENT_CHARS, &
-            PUNCTUATION
+            PUNCTUATION, DOUBLE_QUOTE
   character (len=1), parameter :: TAB = achar(9)
   character (len=2), parameter :: WHITESPACE = achar(9)//" "
   character (len=1), parameter :: BACKSLASH = achar(92)
@@ -389,33 +389,44 @@ contains
   end function concatenate_char_double_fn
 
   !--------------------------------------------------------------------------------------------------
-
-   function short_to_char_fn(value)    result(text)
-     integer (c_short), intent(in)     :: value
-     character (len=:), allocatable    :: text
-
-     integer (c_int)      :: status
-     character (len=32)   :: sbuf
-
-     write(sbuf, fmt=*, iostat=status)  value
-     if (status==0) then
-       text = trim( adjustl(sbuf) )
-     else
-       text = "<NA>"
-     endif
-
-   end function short_to_char_fn
-
-!--------------------------------------------------------------------------------------------------
-
-  function int_to_char_fn(value)    result(text)
-    integer (c_int), intent(in)     :: value
-    character (len=:), allocatable  :: text
+  function short_to_char_fn(value, fmt_string)    result(text)
+    integer (c_short), intent(in)            :: value
+    character (len=*), intent(in), optional  :: fmt_string
+    character (len=:), allocatable           :: text
 
     integer (c_int)      :: status
     character (len=32)   :: sbuf
 
-    write(sbuf, fmt=*, iostat=status)  value
+    if ( present(fmt_string) ) then
+      write(sbuf, fmt="("//trim(fmt_string)//")", iostat=status)  value
+    else
+      write(sbuf, fmt=*, iostat=status)  value
+    endif
+
+    if (status==0) then
+      text = trim( adjustl(sbuf) )
+    else
+      text = "<NA>"
+    endif
+
+  end function short_to_char_fn
+
+!--------------------------------------------------------------------------------------------------
+
+  function int_to_char_fn(value, fmt_string)    result(text)
+    integer (c_int), intent(in)              :: value
+    character (len=*), intent(in), optional  :: fmt_string
+    character (len=:), allocatable           :: text
+
+    integer (c_int)      :: status
+    character (len=32)   :: sbuf
+
+    if ( present(fmt_string) ) then
+      write(sbuf, fmt="("//trim(fmt_string)//")", iostat=status)  value
+    else
+      write(sbuf, fmt=*, iostat=status)  value
+    endif
+
     if (status==0) then
       text = trim( adjustl(sbuf) )
     else
@@ -426,14 +437,20 @@ contains
 
 !--------------------------------------------------------------------------------------------------
 
-  function long_long_to_char_fn(value)    result(text)
-    integer (c_long_long), intent(in)     :: value
-    character (len=:), allocatable        :: text
+  function long_long_to_char_fn(value, fmt_string)    result(text)
+    integer (c_long_long), intent(in)           :: value
+    character (len=*), intent(in), optional  :: fmt_string
+    character (len=:), allocatable           :: text
 
     integer (c_int)      :: status
     character (len=32)   :: sbuf
 
-    write(sbuf, fmt=*, iostat=status)  value
+    if ( present(fmt_string) ) then
+      write(sbuf, fmt="("//trim(fmt_string)//")", iostat=status)  value
+    else
+      write(sbuf, fmt=*, iostat=status)  value
+    endif
+
     if (status==0) then
       text = trim( adjustl(sbuf) )
     else
@@ -444,14 +461,20 @@ contains
 
 !--------------------------------------------------------------------------------------------------
 
-  function float_to_char_fn(value)    result(text)
-    real (c_float), intent(in)      :: value
-    character (len=:), allocatable  :: text
+  function float_to_char_fn(value, fmt_string)    result(text)
+    real (c_float), intent(in)               :: value
+    character (len=*), intent(in), optional  :: fmt_string
+    character (len=:), allocatable           :: text
 
     integer (c_int)      :: status
     character (len=32)   :: sbuf
 
-    write(sbuf, fmt=*, iostat=status)  value
+    if ( present(fmt_string) ) then
+      write(sbuf, fmt="("//trim(fmt_string)//")", iostat=status)  value
+    else
+      write(sbuf, fmt=*, iostat=status)  value
+    endif
+
     if (status==0) then
       text = trim( adjustl(sbuf) )
     else
@@ -462,14 +485,20 @@ contains
 
 !--------------------------------------------------------------------------------------------------
 
-  function double_to_char_fn(value)    result(text)
-    real (c_double), intent(in)      :: value
-    character (len=:), allocatable  :: text
+  function double_to_char_fn(value, fmt_string)    result(text)
+    real (c_double), intent(in)              :: value
+    character (len=*), intent(in), optional  :: fmt_string
+    character (len=:), allocatable           :: text
 
     integer (c_int)      :: status
     character (len=32)   :: sbuf
 
-    write(sbuf, fmt=*, iostat=status)  value
+    if ( present(fmt_string) ) then
+      write(sbuf, fmt="("//trim(fmt_string)//")", iostat=status)  value
+    else
+      write(sbuf, fmt=*, iostat=status)  value
+    endif
+
     if (status==0) then
       text = trim( adjustl(sbuf) )
     else

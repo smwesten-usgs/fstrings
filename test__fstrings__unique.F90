@@ -31,8 +31,8 @@ contains
     myuniquevals = mylist%unique()
 
     call assert_equals("twenty-one", myuniquevals%get(9) )
-    call assert_equals(15, myuniquevals%str_count)
-    call assert_equals(15, myuniquevals%count())
+    call assert_equals(15, myuniquevals%count)
+    call assert_equals(15, myuniquevals%count_entries())
 
   end subroutine test_unique_function
 

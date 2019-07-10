@@ -4,6 +4,7 @@ program tests
   ! test__fstrings__append_list.F90
   ! test__fstrings__chomp.F90
   ! test__fstrings__contains.F90
+  ! test__fstrings__conversions.F90
   ! test__fstrings__count_entries.F90
   ! test__fstrings__grep.F90
   ! test__fstrings__grep_2.F90
@@ -19,6 +20,7 @@ program tests
   use test__fstrings__append_list
   use test__fstrings__chomp
   use test__fstrings__count_matching
+  use test__fstrings__conversions
   use test__fstrings__count_entries
   use test__fstrings__grep
   use test__fstrings__grep_2
@@ -35,12 +37,19 @@ program tests
   ! test__fstrings__append_list.F90:
   call run_test_case(test_append_list_function,"append one FSTRING_LIST_T object to another FSTRING_LIST_T object")
   call run_test_case(test_append_list_missing_values,"create FSTRING_LIST_T objects appended w missing values")
+  call run_test_case(test_detect_missing_values,"test whether empty list entries are detected and counted")
 
   ! test__fstrings__chomp.F90:
   call run_test_case(test_chomp,"test 'chomp' subroutine")
 
   ! test__fstrings__contains.F90:
   call run_test_case(test_count_matching_function,"create FSTRING_LIST_T objects from delimited character strings")
+
+  ! test__fstrings__conversions.F90:
+  call run_test_case(test_c_double_conversions,"test as_character for c_double value")
+  call run_test_case(test_float_conversions,"test as_character for c_float value")
+  call run_test_case(test_short_conversions,"test as_character for c_short value")
+  call run_test_case(test_integer_conversions,"test as_character for c_int value")
 
   ! test__fstrings__count_entries.F90:
   call run_test_case(test_count_function,"create FSTRING_LIST_T objects from delimited character strings")
