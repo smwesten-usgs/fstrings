@@ -46,7 +46,9 @@ module fstring_list
     generic     :: count_entries => count_strings_in_list_fn
 
     procedure   :: retrieve_value_from_list_at_index_fn
-    generic     :: get => retrieve_value_from_list_at_index_fn
+    procedure   :: retrieve_values_for_range_of_indices_fn
+    generic     :: get => retrieve_value_from_list_at_index_fn,                &
+                          retrieve_values_for_range_of_indices_fn
 
     procedure   :: retrieve_values_as_integer_fn
     generic     :: get_integer => retrieve_values_as_integer_fn
@@ -59,6 +61,12 @@ module fstring_list
 
     procedure   :: retrieve_values_as_logical_fn
     generic     :: get_logical => retrieve_values_as_logical_fn
+
+    procedure   :: replace_value_at_index_sub
+    generic     :: replace => replace_value_at_index_sub
+
+    procedure   :: list_all_fn
+    generic     :: list_all => list_all_fn
 
     procedure   :: are_there_missing_list_values_fn
     generic     :: empty_entries_present => are_there_missing_list_values_fn
@@ -440,7 +448,7 @@ end function retrieve_values_as_logical_fn
 
   function retrieve_value_from_list_at_index_fn(this, index_val)   result(text)
 
-    class (FSTRING_LIST_T), intent(inout)         :: this
+    class (FSTRING_LIST_T), intent(inout)     :: this
     integer (c_int), intent(in)               :: index_val
     character(len=:), allocatable             :: text
 
@@ -470,6 +478,80 @@ end function retrieve_values_as_logical_fn
     end do
 
   end function retrieve_value_from_list_at_index_fn
+
+!--------------------------------------------------------------------------------------------------
+
+    subroutine replace_value_at_index_sub(this, index_val, character_str)
+
+      class (FSTRING_LIST_T), intent(inout)     :: this
+      integer (c_int), intent(in)               :: index_val
+      character(len=*)                          :: character_str
+
+      integer (c_int)                :: i
+      type (FSTRING_LIST_T)          :: temp_list
+
+      do i=1, this%count
+        if ( index_val == i ) then
+          call temp_list%append(character_str)
+        else
+          call temp_list%append(this%get(i))
+        endif
+      end do
+
+      this%s = temp_list%s
+
+    end subroutine replace_value_at_index_sub
+
+!--------------------------------------------------------------------------------------------------
+
+  function retrieve_values_for_range_of_indices_fn(this, start_indx, end_indx)   result(text)
+
+    class (FSTRING_LIST_T), intent(inout)       :: this
+    integer (c_int), intent(in)                 :: start_indx
+    integer (c_int), intent(in)                 :: end_indx
+    character (len=:), allocatable              :: text
+
+    integer (c_int)                        :: i
+
+    if (this%count == 0) then
+      text = "<NA>"
+    else
+      do i=1, this%count
+        if (i == start_indx) then
+          text = trim(this%get(i))
+        elseif (i > start_indx .and. i <= end_indx ) then
+          text = trim(text)//" "//trim(this%get(i))
+        endif
+      enddo
+    endif
+
+  end function retrieve_values_for_range_of_indices_fn
+
+!--------------------------------------------------------------------------------------------------
+
+  function list_all_fn(this, delimiter_chr)  result( text )
+
+    class (FSTRING_LIST_T), intent(inout)   :: this
+    character (len=1), intent(in), optional :: delimiter_chr
+    character (len=:), allocatable          :: text
+
+    integer (c_int)  :: i
+
+    if (this%count == 0) then
+      text = "<NA>"
+    elseif (present(delimiter_chr) ) then
+      text = trim(this%get(1))
+      do i=2, this%count
+        text = trim(text)//delimiter_chr//trim(this%get(i))
+      enddo
+    else
+      text = "(1) "//trim(this%get(1))
+      do i=2, this%count
+        text = trim(text)//" ("//as_character(i)//") "//trim(this%get(i))
+      enddo
+    endif
+
+  end function list_all_fn
 
 !--------------------------------------------------------------------------------------------------
 
