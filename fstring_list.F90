@@ -89,6 +89,8 @@ module fstring_list
 !    procedure   :: is_substring_present_in_string_case_sensitive_fn
 !    procedure   :: is_substring_present_in_string_case_insensitive_fn
 
+    procedure   :: return_indices_of_matching_list_entries_fn
+    generic     :: which => return_indices_of_matching_list_entries_fn
 
     procedure   :: return_subset_of_partial_matches_fn
     generic     :: grep => return_subset_of_partial_matches_fn
@@ -98,6 +100,7 @@ module fstring_list
 
   end type FSTRING_LIST_T
 
+  public :: NA_INT, NA_FLOAT, NA_DOUBLE
   integer (c_int), parameter  :: NA_INT    = - (huge(1_c_int)-1_c_int)
   real (c_float), parameter   :: NA_FLOAT  = - (huge(1._c_float)-1._c_float)
   real (c_double), parameter  :: NA_DOUBLE = - (huge(1._c_double)-1._c_double)
@@ -340,25 +343,32 @@ end subroutine append_fstring_to_fstring_sub
 
   function retrieve_values_as_integer_fn(this)   result(values)
 
-    class (FSTRING_LIST_T), intent(inout)         :: this
-    integer (c_int), allocatable              :: values(:)
+    class (FSTRING_LIST_T), intent(inout), target  :: this
+    integer (c_int), allocatable                   :: values(:)
 
     integer (c_int)    :: i
     integer (c_int)    :: value
     integer (c_int)    :: op_status
     character (len=64) :: sbuf
 
-    allocate(values(this%count),stat=op_status)
+    if (this%count <= 0) then
+      allocate(values(1),stat=op_status)
+      values = NA_INT
+    else
 
-    do i=1,this%count
-      sbuf = this%get(i)
-      read(unit=sbuf, fmt=*, iostat=op_status) value
-      if ( op_status==0 ) then
-        values(i) = value
-      else
-        values(i) = NA_INT
-      endif
-    enddo
+      allocate(values(this%count),stat=op_status)
+
+      do i=1,this%count
+        sbuf = this%get(i)
+        value = as_integer(sbuf)
+        if ( op_status==0 ) then
+          values(i) = value
+        else
+          values(i) = NA_INT
+        endif
+      enddo
+
+    endif
 
   end function retrieve_values_as_integer_fn
 
@@ -366,13 +376,52 @@ end subroutine append_fstring_to_fstring_sub
 
   function retrieve_values_as_float_fn(this)   result(values)
 
-    class (FSTRING_LIST_T), intent(inout)         :: this
-    real (c_float), allocatable               :: values(:)
+    class (FSTRING_LIST_T), intent(inout), target    :: this
+    real (c_float), allocatable                      :: values(:)
 
     integer (c_int)    :: i
     real (c_float)     :: value
     integer (c_int)    :: op_status
     character (len=64) :: sbuf
+
+    if (this%count <= 0) then
+      allocate(values(1),stat=op_status)
+      values = NA_FLOAT
+    else
+      allocate(values(this%count),stat=op_status)
+
+      do i=1,this%count
+        sbuf = this%get(i)
+        read(unit=sbuf, fmt=*, iostat=op_status) value
+        if ( op_status==0 ) then
+          values(i) = value
+        else
+          values(i) = NA_FLOAT
+        endif
+      enddo
+
+    endif
+
+  end function retrieve_values_as_float_fn
+
+!--------------------------------------------------------------------------------------------------
+
+function retrieve_values_as_double_fn(this)   result(values)
+
+  class (FSTRING_LIST_T), intent(inout), target   :: this
+  real (c_double), allocatable                    :: values(:)
+
+  integer (c_int)    :: i
+  real (c_double)    :: value
+  integer (c_int)    :: op_status
+  character (len=64) :: sbuf
+
+  if (this%count <=0) then
+
+    allocate(values(1),stat=op_status)
+    values = NA_DOUBLE
+
+  else
 
     allocate(values(this%count),stat=op_status)
 
@@ -382,35 +431,11 @@ end subroutine append_fstring_to_fstring_sub
       if ( op_status==0 ) then
         values(i) = value
       else
-        values(i) = NA_FLOAT
+        values(i) = NA_DOUBLE
       endif
     enddo
 
-  end function retrieve_values_as_float_fn
-
-!--------------------------------------------------------------------------------------------------
-
-function retrieve_values_as_double_fn(this)   result(values)
-
-  class (FSTRING_LIST_T), intent(inout)         :: this
-  real (c_double), allocatable              :: values(:)
-
-  integer (c_int)    :: i
-  real (c_double)    :: value
-  integer (c_int)    :: op_status
-  character (len=64) :: sbuf
-
-  allocate(values(this%count),stat=op_status)
-
-  do i=1,this%count
-    sbuf = this%get(i)
-    read(unit=sbuf, fmt=*, iostat=op_status) value
-    if ( op_status==0 ) then
-      values(i) = value
-    else
-      values(i) = NA_DOUBLE
-    endif
-  enddo
+  endif
 
 end function retrieve_values_as_double_fn
 
@@ -490,15 +515,20 @@ end function retrieve_values_as_logical_fn
       integer (c_int)                :: i
       type (FSTRING_LIST_T)          :: temp_list
 
-      do i=1, this%count
-        if ( index_val == i ) then
-          call temp_list%append(character_str)
-        else
-          call temp_list%append(this%get(i))
-        endif
-      end do
 
-      this%s = temp_list%s
+      if (this%count > 0) then
+
+        do i=1, this%count
+          if ( index_val == i ) then
+            call temp_list%append(character_str)
+          else
+            call temp_list%append(this%get(i))
+          endif
+        end do
+
+        this%s = temp_list%s
+
+      endif
 
     end subroutine replace_value_at_index_sub
 
@@ -918,7 +948,7 @@ end function retrieve_values_as_logical_fn
   function return_subset_of_partial_matches_fn( this, substr )     result(new_fstring)
 
     class (FSTRING_LIST_T), intent(inout)                  :: this
-    character (len=*), intent(in)                      :: substr
+    character (len=*), intent(in)                          :: substr
     type (FSTRING_LIST_T)                                  :: new_fstring
 
     ! [ LOCALS ]
@@ -933,6 +963,43 @@ end function retrieve_values_as_logical_fn
     if ( new_fstring%count == 0 )  new_fstring = "<NA>"
 
   end function return_subset_of_partial_matches_fn
+
+!--------------------------------------------------------------------------------------------------
+
+  function return_indices_of_matching_list_entries_fn(this, character_str)   result(index_values)
+
+    class (FSTRING_LIST_T), intent(inout)                  :: this
+    character (len=*), intent(in)                          :: character_str
+    integer (c_int), allocatable                           :: index_values(:)
+
+    ! [ LOCALS ]
+    integer (c_int)      :: i
+    integer (c_int)      :: match_index
+    logical (c_bool)     :: string_present( this%count )
+    integer (c_int)      :: number_of_matches
+
+    string_present = .false._c_bool
+    match_index = 0
+
+    do i=1, this%count
+      if ( this%get(i) .strapprox. character_str )   string_present(i) = .true._c_bool
+    enddo
+
+    number_of_matches = count(string_present)
+    if (number_of_matches > 0 ) then
+      allocate( index_values(number_of_matches) )
+      do i=1, this%count
+        if (string_present(i)) then
+          match_index = match_index + 1
+          index_values(match_index) = i
+        endif
+      enddo
+    else
+      allocate( index_values(1) )
+      index_values(1) = -9999
+    endif
+
+  end function return_indices_of_matching_list_entries_fn
 
 !--------------------------------------------------------------------------------------------------
 

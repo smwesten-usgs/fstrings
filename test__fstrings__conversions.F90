@@ -67,4 +67,19 @@ contains
 
   end subroutine test_integer_conversions
 
+  subroutine test_string_to_integer_conversions
+    ! test as_integer function
+    integer (c_int)     :: value
+    value = as_integer("CN_42")
+    call assert_equals (42, value)
+  end subroutine test_string_to_integer_conversions
+
+  subroutine test_string_to_float_conversions
+    ! test as_float function
+    real (c_float)     :: value
+    value = as_float("SN_3.1415")
+    call assert_equals (3.1415_c_float, value)
+  end subroutine test_string_to_float_conversions
+
+
 end module test__fstrings__conversions

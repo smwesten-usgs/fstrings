@@ -28,13 +28,13 @@ contains
 
       if (read_status /= 0) exit
 
-      call chomp(sbuf, substr)
+      call chomp(sbuf, substr, ",")
       call name%append(substr)
 
-      call chomp(sbuf, substr)
+      call chomp(sbuf, substr, ",")
       call gender%append(substr)
 
-      call chomp(sbuf, substr)
+      call chomp(sbuf, substr, ",")
       call number%append(substr)
 
     end do
