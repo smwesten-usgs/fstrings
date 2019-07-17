@@ -39,6 +39,7 @@ contains
 
     int_values = mylist%get_integer()
     call assert_equals (1, int_values(1))
+    call assert_equals (2, int_values(2))
 
   end subroutine test_list_retrieve_as_integer
 
