@@ -927,7 +927,7 @@ end function retrieve_values_as_logical_fn
 
       do i=1, this%count
 
-        if ( this%get(i) .contains. substr )  count = count + 1
+        if ( this%get(i) .strequal. substr )  count = count + 1
 
       enddo
 
@@ -935,7 +935,7 @@ end function retrieve_values_as_logical_fn
 
       do i=1, this%count
 
-        if ( this%get(i) .containssimilar. substr )  count = count + 1
+        if ( this%get(i) .strapprox. substr )  count = count + 1
 
       enddo
 
